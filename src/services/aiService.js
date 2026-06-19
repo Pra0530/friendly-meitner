@@ -1,0 +1,69 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+export const generateExecutionTrace = async (apiKey, code, customInput = null) => {
+  if (!apiKey) throw new Error("API Key is missing");
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const prompt = `
+You are an algorithmic code visualizer.
+Trace the following code step-by-step and return a JSON object describing the execution trace.
+We support layout types: "ARRAY", "LINKED_LIST", "TREE", "GRAPH", "VARIABLES".
+
+Analyze what the code is doing, pick the best layout, define the initial data structure, and then trace the variables/pointers line by line.
+
+CRITICAL INSTRUCTIONS:
+- Trace the code EXACTLY as a computer would. YOU MUST NOT SKIP ANY ITERATIONS. 
+- Never summarize the execution. Go step-by-step through the entire loop until the code naturally returns.
+- Look at the actual data structure values before deciding which if/else branch to take.
+- Line numbers MUST perfectly match the 1-indexed line numbers of the provided code block. Double check your line numbers.
+- For a while/for loop, trace the loop evaluation line, then the inner lines, then the loop evaluation line again for each iteration.
+- If a pointer/index goes out of bounds or becomes null, set its value to -1 or "null".
+
+DATA SCHEMAS based on layout_type:
+- ARRAY or LINKED_LIST: "initial_data": [10, 20, 30] (array of values). Pointers point to indices.
+- TREE: "initial_data": [{ "id": "n1", "val": 10, "left": "n2", "right": "n3" }, { "id": "n2", "val": 5 }]. "root_id": "n1". Pointers point to "id" strings!
+- GRAPH: "initial_data": { "nodes": [{ "id": "A", "val": 1 }], "edges": [["A", "B"]] }. Pointers point to "id" strings!
+
+The JSON MUST exactly match this format:
+{
+  "layout_type": "ARRAY" | "LINKED_LIST" | "TREE" | "GRAPH" | "VARIABLES",
+  "root_id": "<only_if_tree>",
+  "initial_data": <depends_on_schema_above>,
+  "trace": [
+    {
+      "line": <line_number>,
+      "explanation": "<brief_description_of_step>",
+      "reasonTag": "<reason tag: 'new-min' | 'new-max-profit' | 'loop-check' | 'init' | 'other'>",
+      "pointers": { "<name>": <index_or_id> },
+      "variables": { "<name>": "<value_as_string>" }
+    }
+  ]
+}
+
+Code to trace:
+${code.split('\n').map((l, i) => `${i + 1}: ${l}`).join('\n')}
+
+${customInput ? `CRITICAL: Ignore any function calls at the bottom of the code. Instead, execute the main function using this exact input data: [${customInput}]. The initial_data array MUST be [${customInput}].` : ''}
+`;
+
+  let rawText = "";
+  try {
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+      }
+    });
+    
+    rawText = result.response.text();
+    // Sometimes Gemini wraps JSON in markdown blocks even when responseMimeType is set
+    rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    return JSON.parse(rawText);
+  } catch (error) {
+    console.error("AI Generation Failed:", error, rawText);
+    throw new Error(`Failed to trace code: ${error.message || "Invalid output from AI"}`);
+  }
+};
