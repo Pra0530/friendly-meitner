@@ -82,15 +82,7 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* API Key Settings Button */}
-      <div style={{ position: 'absolute', top: '16px', right: '24px', zIndex: 10, display: 'flex', gap: '8px' }}>
-         <button className="icon-button" onClick={() => setIsQuestionBankOpen(true)} title="DSA 100 Question Bank">
-            <BookOpen size={18} />
-         </button>
-         <button className="icon-button" onClick={() => setIsKeyModalOpen(true)} title="Settings">
-            <Key size={18} />
-         </button>
-      </div>
+      {/* Removed absolute buttons from here */}
 
       <QuestionBank 
         isOpen={isQuestionBankOpen} 
@@ -129,7 +121,15 @@ function App() {
           onCodeChange={(c) => setEditorCode(c)}
         />
       </div>
-      <div className="glass-panel visualizer-panel">
+      <div className="glass-panel visualizer-panel" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '12px' }}>
+          <button className="icon-button" onClick={() => setIsQuestionBankOpen(true)} title="DSA 100 Question Bank">
+             <BookOpen size={16} /> <span style={{ marginLeft: '6px', fontSize: '13px', fontWeight: '500' }}>Catalogue</span>
+          </button>
+          <button className="icon-button" onClick={() => setIsKeyModalOpen(true)} title="Settings">
+             <Key size={16} /> <span style={{ marginLeft: '6px', fontSize: '13px', fontWeight: '500' }}>API Key</span>
+          </button>
+        </div>
         <InputEditor 
           onRun={(customInput) => handlePlay(editorCode, customInput)} 
           isAnalyzing={isAnalyzing} 
