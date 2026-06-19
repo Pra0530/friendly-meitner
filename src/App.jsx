@@ -44,6 +44,15 @@ function App() {
     const q = typeof qData === 'string' ? { title: qData } : qData;
     setActiveQuestion(q);
     
+    // Reset visualizer state when switching questions
+    setStep(0);
+    setIsPlaying(false);
+    setAiData({
+      layout_type: "ARRAY",
+      initial_data: [],
+      trace: []
+    });
+    
     // If we have a pre-written perfect code block, drop it in!
     if (q.code) {
       setEditorInitialCode(q.code);
