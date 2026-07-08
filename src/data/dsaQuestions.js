@@ -574,6 +574,7 @@ butterfly(3);`
   {
     category: "String",
     questions: [
+      { title: "Reverse String" },
       { title: "Is Subsequence" },
       { title: "Valid Palindrome" },
       { title: "Longest Substring Without Repeating Characters" },
@@ -591,6 +592,8 @@ butterfly(3);`
   {
     category: "Linked List",
     questions: [
+      { title: "Reverse Linked List II" },
+      { title: "Find Start of Cycle" },
       { title: "Reverse a Linked List" },
       { title: "Detect Cycle in a Linked List" },
       { title: "Merge Two Sorted Lists" },
@@ -605,6 +608,8 @@ butterfly(3);`
   {
     category: "Stack & Queue",
     questions: [
+      { title: "Queue Data Structure" },
+      { title: "Stack Data Structure" },
       { title: "Valid Parentheses" },
       { title: "Convert Infix expression to Postfix expression" },
       { title: "Next Greater Element" },
@@ -619,6 +624,9 @@ butterfly(3);`
   {
     category: "10 Must-Know Graph Algorithms",
     questions: [
+      { title: "Bidirectional BFS" },
+      { title: "Graph - Adjacency List" },
+      { title: "Graph - Adjacency Matrix" },
       { title: "Depth-First Search" },
       { title: "Breadth-First Search" },
       { title: "Topological Sort" },
@@ -703,10 +711,39 @@ fib(5);`
   {
     category: "Sorting",
     questions: [
+      { title: "Merge Sort" },
       { title: "Quick Sort" },
       { title: "Insertion Sort" },
       { title: "Selection Sort" },
       { title: "Bubble Sort" }
+    ]
+  },
+  {
+    category: "Binary Tree",
+    questions: [
+      { title: "Invert Binary Tree" },
+      { title: "Height of Binary Tree" }
+    ]
+  },
+  {
+    category: "Backtracking",
+    questions: [
+      { title: "Subsets" },
+      { title: "Generate Parentheses" },
+      { title: "N-Queens" }
+    ]
+  },
+  {
+    category: "Recursion",
+    questions: [
+      { title: "Tower of Hanoi" }
+    ]
+  },
+  {
+    category: "Computer Science Concepts",
+    questions: [
+      { title: "Concurrency vs Parallelism" },
+      { title: "Big O" }
     ]
   },
   {
