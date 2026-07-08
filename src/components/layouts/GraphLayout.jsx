@@ -3,41 +3,33 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const POINTER_COLORS = ['var(--accent-color)', 'var(--success-color)', 'var(--warning-color)', 'var(--danger-color)'];
 
-const TreeLayout = ({ initial_data, root_id, pointers, currentState }) => {
+const GraphLayout = ({ initial_data, pointers, currentState }) => {
   const visitedNodes = currentState?.visited_nodes || [];
   const visitedEdges = currentState?.visited_edges || [];
+
   const { nodes, edges, positions } = useMemo(() => {
-    if (!initial_data || !Array.isArray(initial_data)) return { nodes: [], edges: [], positions: {} };
+    if (!initial_data || !initial_data.nodes || !initial_data.edges) return { nodes: [], edges: [], positions: {} };
 
-    const nodeMap = {};
-    initial_data.forEach(n => nodeMap[n.id] = n);
-
+    const nodesList = initial_data.nodes;
+    const edgeList = initial_data.edges;
     const pos = {};
-    const edgeList = [];
-    
-    // Recursive function to assign positions
-    const traverse = (nodeId, x, y, horizontalSpacing) => {
-      if (!nodeId || !nodeMap[nodeId]) return;
-      
-      pos[nodeId] = { x, y };
-      
-      const node = nodeMap[nodeId];
-      if (node.left) {
-        edgeList.push({ from: nodeId, to: node.left });
-        traverse(node.left, x - horizontalSpacing, y + 80, horizontalSpacing / 1.8);
-      }
-      if (node.right) {
-        edgeList.push({ from: nodeId, to: node.right });
-        traverse(node.right, x + horizontalSpacing, y + 80, horizontalSpacing / 1.8);
-      }
-    };
 
-    if (root_id) {
-      traverse(root_id, 300, 40, 120); // Center of 600px canvas
-    }
+    // Circular layout
+    const centerX = 300;
+    const centerY = 200;
+    const radius = 120;
+    const n = nodesList.length;
 
-    return { nodes: initial_data, edges: edgeList, positions: pos };
-  }, [initial_data, root_id]);
+    nodesList.forEach((node, i) => {
+      const angle = (i / n) * 2 * Math.PI - Math.PI / 2; // start at top
+      pos[node.id] = {
+        x: centerX + radius * Math.cos(angle) - 24, // subtract half width to center
+        y: centerY + radius * Math.sin(angle) - 24
+      };
+    });
+
+    return { nodes: nodesList, edges: edgeList, positions: pos };
+  }, [initial_data]);
 
   return (
     <div style={{ position: 'relative', width: '600px', height: '400px', margin: '0 auto' }}>
@@ -45,13 +37,13 @@ const TreeLayout = ({ initial_data, root_id, pointers, currentState }) => {
       {/* SVG for Edges */}
       <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
         {edges.map((edge, i) => {
-          const fromPos = positions[edge.from];
-          const toPos = positions[edge.to];
+          const fromPos = positions[edge[0]];
+          const toPos = positions[edge[1]];
           if (!fromPos || !toPos) return null;
           
           const isVisited = visitedEdges.some(e => 
-            (e[0] === edge.from && e[1] === edge.to) || 
-            (e[1] === edge.from && e[0] === edge.to)
+            (e[0] === edge[0] && e[1] === edge[1]) || 
+            (e[1] === edge[0] && e[0] === edge[1])
           );
           
           return (
@@ -115,7 +107,7 @@ const TreeLayout = ({ initial_data, root_id, pointers, currentState }) => {
                 width: '48px',
                 height: '48px',
                 minWidth: '48px',
-                borderRadius: '50%', // Circle for trees
+                borderRadius: '50%', // Circle for graphs
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -126,7 +118,7 @@ const TreeLayout = ({ initial_data, root_id, pointers, currentState }) => {
                 transition: 'all 0.3s ease'
               }}
             >
-              {node.val}
+              {node.val || node.id}
             </motion.div>
           </div>
         );
@@ -135,4 +127,4 @@ const TreeLayout = ({ initial_data, root_id, pointers, currentState }) => {
   );
 };
 
-export default TreeLayout;
+export default GraphLayout;

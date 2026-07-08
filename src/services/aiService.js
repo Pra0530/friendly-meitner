@@ -8,7 +8,7 @@ export const generateExecutionTrace = async (apiKey, code, customInput = null) =
   const prompt = `
 You are an algorithmic code visualizer.
 Trace the following code step-by-step and return a JSON object describing the execution trace.
-We support layout types: "ARRAY", "LINKED_LIST", "TREE", "GRAPH", "VARIABLES".
+We support layout types: "ARRAY", "LINKED_LIST", "TREE", "GRAPH", "MATRIX", "VARIABLES", "STACK".
 
 Analyze what the code is doing, pick the best layout, define the initial data structure, and then trace the variables/pointers line by line.
 
@@ -21,21 +21,25 @@ CRITICAL INSTRUCTIONS:
 - If a pointer/index goes out of bounds or becomes null, set its value to -1 or "null".
 
 DATA SCHEMAS based on layout_type:
-- ARRAY or LINKED_LIST: "initial_data": [10, 20, 30] (array of values). Pointers point to indices.
+- ARRAY or LINKED_LIST or STACK: "initial_data": [10, 20, 30] (array of values). Pointers point to indices. STACK is for Monotonic Stacks.
 - TREE: "initial_data": [{ "id": "n1", "val": 10, "left": "n2", "right": "n3" }, { "id": "n2", "val": 5 }]. "root_id": "n1". Pointers point to "id" strings!
 - GRAPH: "initial_data": { "nodes": [{ "id": "A", "val": 1 }], "edges": [["A", "B"]] }. Pointers point to "id" strings!
+- MATRIX: "initial_data": [[" ", " "], [" ", " "]]. Trace step can optionally include "matrix_state" to reflect changes. Pointers point to [row, col] coordinates!
 
 The JSON MUST exactly match this format:
 {
-  "layout_type": "ARRAY" | "LINKED_LIST" | "TREE" | "GRAPH" | "VARIABLES",
+  "layout_type": "ARRAY" | "LINKED_LIST" | "TREE" | "GRAPH" | "MATRIX" | "VARIABLES" | "STACK",
   "root_id": "<only_if_tree>",
   "initial_data": <depends_on_schema_above>,
   "trace": [
     {
       "line": <line_number>,
+      "matrix_state": <optional_updated_2d_array_for_matrix>,
+      "visited_nodes": <optional_array_of_visited_node_ids_for_tree_or_graph>,
+      "visited_edges": <optional_array_of_visited_edges_like_[["A","B"]]_for_tree_or_graph>,
       "explanation": "<brief_description_of_step>",
       "reasonTag": "<reason tag: 'new-min' | 'new-max-profit' | 'loop-check' | 'init' | 'other'>",
-      "pointers": { "<name>": <index_or_id> },
+      "pointers": { "<name>": <index_or_id_or_coordinate_array> },
       "variables": { "<name>": "<value_as_string>" }
     }
   ]

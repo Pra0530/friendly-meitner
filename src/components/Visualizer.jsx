@@ -3,6 +3,9 @@ import { motion } from 'framer-motion';
 import { Play, Pause, SkipBack, SkipForward, Zap, RotateCcw } from 'lucide-react';
 import ArrayLayout from './layouts/ArrayLayout';
 import TreeLayout from './layouts/TreeLayout';
+import MatrixLayout from './layouts/MatrixLayout';
+import StackLayout from './layouts/StackLayout';
+import GraphLayout from './layouts/GraphLayout';
 import TraceLog from './TraceLog';
 import PlaybackControls from './PlaybackControls';
 import VariablePanel from './VariablePanel';
@@ -59,8 +62,14 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
       <div className="canvas-area" style={{ overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {layout_type === 'array' || layout_type === 'linked_list' ? (
         <ArrayLayout initial_data={initial_data} layout_type={layout_type} pointers={pointers} traceHistory={trace.slice(0, step + 1)} />
-      ) : layout_type === 'tree' || layout_type === 'graph' ? (
-        <TreeLayout initial_data={initial_data} root_id={root_id} pointers={pointers} />
+      ) : layout_type === 'tree' ? (
+        <TreeLayout initial_data={initial_data} root_id={root_id} pointers={pointers} currentState={currentState} />
+      ) : layout_type === 'graph' ? (
+        <GraphLayout initial_data={initial_data} pointers={pointers} currentState={currentState} />
+      ) : layout_type === 'matrix' ? (
+        <MatrixLayout initial_data={initial_data} pointers={pointers} currentState={currentState} />
+      ) : layout_type === 'stack' ? (
+        <StackLayout initial_data={initial_data} pointers={pointers} traceHistory={trace.slice(0, step + 1)} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)', opacity: 0.5 }}>
           <Zap size={48} style={{ marginBottom: '16px' }} />

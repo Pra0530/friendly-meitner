@@ -1,5 +1,59 @@
 export const dsaQuestions = [
   {
+    category: "15 Patterns",
+    questions: [
+      { title: "Two Pointers" },
+      { title: "Sliding Window" },
+      { title: "Binary Search" },
+      { title: "Frequency Counting" },
+      { title: "Matrix Traversal" },
+      { 
+        title: "Monotonic Stack",
+        code: `// Monotonic Stack Example
+function nextGreaterElement(nums) {
+  let stack = [];
+  let result = new Array(nums.length).fill(-1);
+  for (let i = 0; i < nums.length; i++) {
+    while (stack.length > 0 && nums[stack[stack.length - 1]] < nums[i]) {
+      let idx = stack.pop();
+      result[idx] = nums[i];
+    }
+    stack.push(i);
+  }
+  return result;
+}
+nextGreaterElement([2, 1, 2, 4, 3]);`
+      },
+      { title: "Prefix Sum" },
+      { title: "Overlapping Intervals" },
+      { title: "Greedy" },
+      { title: "Top K Elements" },
+      { title: "Backtracking" },
+      { title: "Binary Tree Traversal" },
+      { title: "Depth-First Search" },
+      { title: "Breadth-First Search" },
+      { title: "Dynamic Programming" }
+    ]
+  },
+  {
+    category: "Tree Traversals",
+    questions: [
+      { 
+        title: "Preorder Traversal",
+        code: `// Preorder Traversal
+function preorder(node) {
+  if (!node) return;
+  console.log(node.val);
+  preorder(node.left);
+  preorder(node.right);
+}`
+      },
+      { title: "Inorder Traversal" },
+      { title: "Postorder Traversal" },
+      { title: "Level-order Traversal" }
+    ]
+  },
+  {
     category: "Array",
     questions: [
       {
@@ -319,6 +373,135 @@ maxArea([1, 8, 6, 2, 5, 4, 8, 3, 7]);`
     ]
   },
   {
+    category: "Star Patterns",
+    questions: [
+      {
+        title: "Right Triangle",
+        insight: {
+          pattern: "Nested Loops",
+          intuition: "The number of stars in each row equals the row number (1-indexed).",
+          time: "O(n²)",
+          space: "O(n²)"
+        },
+        code: `// 1. Right Triangle Star Pattern
+
+function rightTriangle(n) {
+  let grid = Array.from({length: n}, () => Array(n).fill(" "));
+  
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j <= i; j++) {
+      grid[i][j] = "*";
+    }
+  }
+  return grid;
+}
+
+rightTriangle(5);`
+      },
+      {
+        title: "Hollow Square",
+        insight: {
+          pattern: "Boundary Checking",
+          intuition: "Print a star only if you are on the first row, last row, first column, or last column.",
+          time: "O(n²)",
+          space: "O(n²)"
+        },
+        code: `// 2. Hollow Square Star Pattern
+
+function hollowSquare(n) {
+  let grid = Array.from({length: n}, () => Array(n).fill(" "));
+  
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (i === 0 || i === n - 1 || j === 0 || j === n - 1) {
+        grid[i][j] = "*";
+      } else {
+        grid[i][j] = " ";
+      }
+    }
+  }
+  return grid;
+}
+
+hollowSquare(5);`
+      },
+      {
+        title: "Diamond Pattern",
+        insight: {
+          pattern: "Two Halves / Symmetry",
+          intuition: "Split the logic into an upper pyramid and a lower inverted pyramid. Manage spaces and stars mathematically.",
+          time: "O(n²)",
+          space: "O(n²)"
+        },
+        code: `// 3. Diamond Star Pattern
+
+function diamond(n) {
+  const size = 2 * n - 1;
+  let grid = Array.from({length: size}, () => Array(size).fill(" "));
+  
+  // Upper half
+  for (let i = 1; i <= n; i++) {
+    let startSpace = n - i;
+    let stars = 2 * i - 1;
+    for (let j = 0; j < stars; j++) {
+      grid[i - 1][startSpace + j] = "*";
+    }
+  }
+  
+  // Lower half
+  for (let i = n - 1; i >= 1; i--) {
+    let startSpace = n - i;
+    let stars = 2 * i - 1;
+    for (let j = 0; j < stars; j++) {
+      grid[(2 * n - 1) - i][startSpace + j] = "*";
+    }
+  }
+  return grid;
+}
+
+diamond(3);`
+      },
+      {
+        title: "Butterfly Pattern",
+        insight: {
+          pattern: "Mirror Symmetry",
+          intuition: "Similar to the diamond, split into upper and lower halves. Each row has stars on the left, spaces in the middle, and stars on the right.",
+          time: "O(n²)",
+          space: "O(n²)"
+        },
+        code: `// 4. Butterfly Star Pattern
+
+function butterfly(n) {
+  const size = 2 * n;
+  let grid = Array.from({length: size}, () => Array(size).fill(" "));
+  
+  // Upper half
+  for (let i = 1; i <= n; i++) {
+    let spaces = 2 * (n - i);
+    // Left stars
+    for (let j = 0; j < i; j++) grid[i - 1][j] = "*";
+    // Right stars
+    for (let j = 0; j < i; j++) grid[i - 1][size - 1 - j] = "*";
+  }
+  
+  // Lower half
+  for (let i = n; i >= 1; i--) {
+    let rowIdx = (2 * n) - i;
+    let spaces = 2 * (n - i);
+    // Left stars
+    for (let j = 0; j < i; j++) grid[rowIdx][j] = "*";
+    // Right stars
+    for (let j = 0; j < i; j++) grid[rowIdx][size - 1 - j] = "*";
+  }
+  
+  return grid;
+}
+
+butterfly(3);`
+      }
+    ]
+  },
+  {
     category: "Matrix",
     questions: [
       { title: "Set Matrix Zeroes" },
@@ -370,21 +553,18 @@ maxArea([1, 8, 6, 2, 5, 4, 8, 3, 7]);`
     ]
   },
   {
-    category: "Graph",
+    category: "10 Must-Know Graph Algorithms",
     questions: [
-      { title: "Clone Graph" },
-      { title: "Course Schedule" },
-      { title: "Pacific Atlantic Water Flow" },
-      { title: "Number of Islands" },
-      { title: "Longest Consecutive Sequence" },
-      { title: "Snake and Ladder Problem" },
-      { title: "Detect Cycle in a Directed Graph" },
-      { title: "Bridges in a graph" },
-      { title: "Check whether a given graph is Bipartite or not" },
-      { title: "Find size of the largest region in Boolean Matrix" },
-      { title: "Flood fill Algorithm" },
-      { title: "Strongly Connected Components" },
-      { title: "Topological Sorting" }
+      { title: "Depth-First Search" },
+      { title: "Breadth-First Search" },
+      { title: "Topological Sort" },
+      { title: "Union Find / DSU" },
+      { title: "Cycle Detection" },
+      { title: "Connected Components" },
+      { title: "Bipartite Check" },
+      { title: "Flood Fill" },
+      { title: "Minimum Spanning Tree" },
+      { title: "Shortest Path" }
     ]
   },
   {
