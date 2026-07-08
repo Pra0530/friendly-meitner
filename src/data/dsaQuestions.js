@@ -1,5 +1,23 @@
 export const dsaQuestions = [
   {
+    category: "13 Must-Know Data Structures",
+    questions: [
+      { title: "Array" },
+      { title: "Linked List" },
+      { title: "Stack" },
+      { title: "HashMap" },
+      { title: "Matrix" },
+      { title: "Queue" },
+      { title: "Deque" },
+      { title: "Binary Tree" },
+      { title: "BST (Binary Search Tree)" },
+      { title: "Heap" },
+      { title: "Trie" },
+      { title: "Graph" },
+      { title: "Union Find" }
+    ]
+  },
+  {
     category: "15 Patterns",
     questions: [
       { title: "Two Pointers" },
@@ -201,6 +219,45 @@ function maxSubArray(nums) {
 }
 
 maxSubArray([-2, 1, -3, 4, -1, 2, 1, -5, 4]);`
+      },
+      {
+        title: "Sort Colors (Dutch National Flag)",
+        insight: {
+          pattern: "Three Pointers",
+          intuition: "Use low, mid, and high pointers to partition the array into 0s, 1s, and 2s in a single pass.",
+          time: "O(n)",
+          space: "O(1)"
+        },
+        code: `// Sort Colors (Dutch National Flag Problem)
+// Array contains only 0s, 1s, and 2s.
+
+function sortColors(nums) {
+  let low = 0;
+  let mid = 0;
+  let high = nums.length - 1;
+  
+  while (mid <= high) {
+    if (nums[mid] === 0) {
+      // Swap low and mid
+      let temp = nums[low];
+      nums[low] = nums[mid];
+      nums[mid] = temp;
+      low++;
+      mid++;
+    } else if (nums[mid] === 1) {
+      mid++;
+    } else {
+      // Swap mid and high
+      let temp = nums[high];
+      nums[high] = nums[mid];
+      nums[mid] = temp;
+      high--;
+    }
+  }
+  return nums;
+}
+
+sortColors([2, 0, 2, 1, 1, 0]);`
       },
       {
         title: "Maximum Product Subarray",
@@ -580,6 +637,41 @@ butterfly(3);`
   {
     category: "Dynamic Programming",
     questions: [
+      {
+        title: "Fibonacci (Recursion vs Memoization)",
+        insight: {
+          pattern: "Memoization (Top-Down DP)",
+          intuition: "Cache results of expensive recursive calls to avoid computing the same subproblems repeatedly.",
+          time: "O(n)",
+          space: "O(n)"
+        },
+        code: `// Fibonacci with Memoization
+// Visualizing the call tree and cached results
+
+const memo = {};
+
+function fib(n) {
+  // Check cache
+  if (n in memo) {
+    return memo[n];
+  }
+  
+  // Base cases
+  if (n <= 1) {
+    return n;
+  }
+  
+  // Recursive calls
+  const result = fib(n - 1) + fib(n - 2);
+  
+  // Store in cache
+  memo[n] = result;
+  
+  return result;
+}
+
+fib(5);`
+      },
       { title: "Count ways to reach the n'th stair" },
       { title: "Coin Change" },
       { title: "0/1 Knapsack Problem" },
