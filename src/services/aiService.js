@@ -19,6 +19,7 @@ CRITICAL INSTRUCTIONS:
 - Line numbers MUST perfectly match the 1-indexed line numbers of the provided code block. Double check your line numbers.
 - For a while/for loop, trace the loop evaluation line, then the inner lines, then the loop evaluation line again for each iteration.
 - If a pointer/index goes out of bounds or becomes null, set its value to -1 or "null".
+- RANGE LOOPS MANDATORY RULE: If the code uses a loop to iterate over a range of numbers (e.g. "for i in range(start, end)" or a standard for loop), you MUST use the "ARRAY" layout. The "initial_data" MUST be the complete array of numbers in that range (e.g. [9, 10, 11, 12, 13, 14, 15, 16, 17]). The loop variable (e.g. "i") MUST be a pointer representing the INDEX of the current number in the initial_data array, NOT the value itself (e.g. if i is 10, the pointer points to index 1). DO NOT use the "VARIABLES" layout for code that loops over ranges of numbers!
 
 DATA SCHEMAS based on layout_type:
 - ARRAY or LINKED_LIST or STACK: "initial_data": [10, 20, 30] (array of values). Pointers point to indices. STACK is for Monotonic Stacks. (If the code iterates over a range of numbers, use ARRAY layout and set initial_data to the array of numbers in that range, and set the pointer to the index of the current number).
