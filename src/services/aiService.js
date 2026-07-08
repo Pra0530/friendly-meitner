@@ -50,7 +50,7 @@ The JSON MUST exactly match this format:
 Code to trace:
 ${code.split('\n').map((l, i) => `${i + 1}: ${l}`).join('\n')}
 
-${customInput ? `CRITICAL: Ignore any function calls at the bottom of the code. Instead, execute the main function using this exact input data: [${customInput}]. The initial_data array MUST be [${customInput}].` : ''}
+${customInput ? `CRITICAL: If the code accepts an array/list as input, execute the main function using this exact input data: [${customInput}] and set initial_data to [${customInput}]. If the code does not process an array/list input (e.g. it only uses scalar values or ranges), ignore this custom input and select the best layout (e.g., ARRAY for ranges, where initial_data is the range array).` : ''}
 `;
 
   let rawText = "";
