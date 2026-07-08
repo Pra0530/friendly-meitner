@@ -21,7 +21,7 @@ CRITICAL INSTRUCTIONS:
 - If a pointer/index goes out of bounds or becomes null, set its value to -1 or "null".
 
 DATA SCHEMAS based on layout_type:
-- ARRAY or LINKED_LIST or STACK: "initial_data": [10, 20, 30] (array of values). Pointers point to indices. STACK is for Monotonic Stacks.
+- ARRAY or LINKED_LIST or STACK: "initial_data": [10, 20, 30] (array of values). Pointers point to indices. STACK is for Monotonic Stacks. (If the code iterates over a range of numbers, use ARRAY layout and set initial_data to the array of numbers in that range, and set the pointer to the index of the current number).
 - TREE: "initial_data": [{ "id": "n1", "val": 10, "left": "n2", "right": "n3" }, { "id": "n2", "val": 5 }]. "root_id": "n1". Pointers point to "id" strings!
 - GRAPH: "initial_data": { "nodes": [{ "id": "A", "val": 1 }], "edges": [["A", "B"]] }. Pointers point to "id" strings!
 - MATRIX: "initial_data": [[" ", " "], [" ", " "]]. Trace step can optionally include "matrix_state" to reflect changes. Pointers point to [row, col] coordinates!
