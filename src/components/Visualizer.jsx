@@ -6,6 +6,7 @@ import TreeLayout from './layouts/TreeLayout';
 import MatrixLayout from './layouts/MatrixLayout';
 import StackLayout from './layouts/StackLayout';
 import GraphLayout from './layouts/GraphLayout';
+import SystemLayout from './layouts/SystemLayout';
 import TraceLog from './TraceLog';
 import PlaybackControls from './PlaybackControls';
 import VariablePanel from './VariablePanel';
@@ -70,6 +71,8 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
         <MatrixLayout initial_data={initial_data} pointers={pointers} currentState={currentState} />
       ) : layout_type === 'stack' ? (
         <StackLayout initial_data={initial_data} pointers={pointers} traceHistory={trace.slice(0, step + 1)} />
+      ) : layout_type === 'system' ? (
+        <SystemLayout initial_data={initial_data} currentState={currentState} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)', opacity: 0.5 }}>
           <Zap size={48} style={{ marginBottom: '16px' }} />
