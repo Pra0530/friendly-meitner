@@ -599,5 +599,65 @@ butterfly(3);`
       { title: "Maximum Product Cutting" },
       { title: "Count number of ways to cover a distance" }
     ]
+  },
+  {
+    category: "System Design (Caching)",
+    questions: [
+      { 
+        title: "Cache Aside",
+        insight: {
+          pattern: "Read strategy",
+          intuition: "App checks cache. On miss, app loads from DB and updates cache. Good for read-heavy workloads.",
+          time: "N/A",
+          space: "N/A"
+        },
+        code: `// Cache Aside Strategy
+// 1. App requests data from Cache (Miss)
+// 2. App reads data from Database
+// 3. App writes data to Cache
+// 4. App returns data to user
+
+async function getUser(userId) {
+  let user = await cache.get(userId);
+  if (!user) {
+    user = await db.get(userId);
+    await cache.set(userId, user);
+  }
+  return user;
+}
+getUser(123);`
+      },
+      { title: "Read Through" },
+      { title: "Write Through" },
+      { title: "Write Around" },
+      { title: "Write Back" }
+    ]
+  },
+  {
+    category: "Git Workflows",
+    questions: [
+      { 
+        title: "How Git Works (Commit)",
+        insight: {
+          pattern: "Version Control",
+          intuition: "Files move from Working Directory -> Staging Area -> Local Repo -> Remote",
+          time: "N/A",
+          space: "N/A"
+        },
+        code: `// Git workflow for committing changes
+// 1. Edit files in Working Directory
+// 2. git add (moves to Staging Area)
+// 3. git commit (saves to Local Repository)
+// 4. git push (uploads to Remote)
+
+function gitWorkflow() {
+  editFile("app.js");
+  runCmd("git add app.js");
+  runCmd("git commit -m 'add feature'");
+  runCmd("git push origin main");
+}
+gitWorkflow();`
+      }
+    ]
   }
 ];
