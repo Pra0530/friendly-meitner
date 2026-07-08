@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 export const generateExecutionTrace = async (apiKey, code, customInput = null) => {
   if (!apiKey) throw new Error("API Key is missing");
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
 
   const prompt = `
 You are an algorithmic code visualizer.
