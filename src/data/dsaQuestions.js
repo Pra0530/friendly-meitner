@@ -103,6 +103,10 @@ function twoSum(arr, target) {
 // Target is 14. Pair is (3, 11) -> indices in sorted array: 0 and 3
 twoSum([11, 15, 3, 7], 14);`
       },
+      { title: "Remove Duplicates from Sorted Array" },
+      { title: "Move Zeroes" },
+      { title: "Rotate Image 90°" },
+      { title: "Max Sum Subarray of Size K" },
       {
         title: "Best Time to Buy and Sell Stock",
         link: "https://takeuforward.org/data-structure/stock-buy-and-sell/",
@@ -570,6 +574,8 @@ butterfly(3);`
   {
     category: "String",
     questions: [
+      { title: "Is Subsequence" },
+      { title: "Valid Palindrome" },
       { title: "Longest Substring Without Repeating Characters" },
       { title: "Longest Repeating Character Replacement" },
       { title: "Smallest window in a String containing all characters of other String" },
@@ -599,6 +605,7 @@ butterfly(3);`
   {
     category: "Stack & Queue",
     questions: [
+      { title: "Valid Parentheses" },
       { title: "Convert Infix expression to Postfix expression" },
       { title: "Next Greater Element" },
       { title: "Delete middle element of a stack" },
@@ -621,6 +628,7 @@ butterfly(3);`
       { title: "Bipartite Check" },
       { title: "Flood Fill" },
       { title: "Minimum Spanning Tree" },
+      { title: "Kruskal's Algorithm" },
       { title: "Shortest Path" }
     ]
   },
@@ -690,6 +698,30 @@ fib(5);`
       { title: "Cutting a Rod" },
       { title: "Maximum Product Cutting" },
       { title: "Count number of ways to cover a distance" }
+    ]
+  },
+  {
+    category: "Sorting",
+    questions: [
+      { title: "Quick Sort" },
+      { title: "Insertion Sort" },
+      { title: "Selection Sort" },
+      { title: "Bubble Sort" }
+    ]
+  },
+  {
+    category: "Hashing",
+    questions: [
+      { title: "Hash Table - Separate Chaining" }
+    ]
+  },
+  {
+    category: "SQL",
+    questions: [
+      { title: "SQL Execution Order" },
+      { title: "LEFT JOIN" },
+      { title: "RIGHT JOIN" },
+      { title: "FULL OUTER JOIN" }
     ]
   },
   {
