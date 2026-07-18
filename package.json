@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "acorn": "^8.17.0",
+    "dagre": "^0.8.5",
+    "escodegen": "^2.1.0",
     "framer-motion": "^12.40.0",
     "lucide-react": "^1.17.0",
     "prismjs": "^1.30.0",
@@ -19,6 +22,7 @@
     "react-simple-code-editor": "^0.14.1"
   },
   "devDependencies": {
+    "@babel/standalone": "^7.29.7",
     "@eslint/js": "^10.0.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

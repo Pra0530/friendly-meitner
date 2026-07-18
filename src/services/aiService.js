@@ -1,76 +1,216 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { instrumentJS, runJSSandbox } from "./jsInterpreter";
+import { runPythonSandbox } from "./pythonInterpreter";
+import { mapStructure } from "./structureMapper";
 
-export const generateExecutionTrace = async (apiKey, code, customInput = null) => {
-  if (!apiKey) throw new Error("API Key is missing");
+/**
+ * Stage 1: Classifies the algorithm's layout type using a fast LLM call.
+ */
+export const classifyLayout = async (apiKey, code) => {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
 
   const prompt = `
-You are an algorithmic code visualizer.
-Trace the following code step-by-step and return a JSON object describing the execution trace.
-We support layout types: "ARRAY", "LINKED_LIST", "TREE", "GRAPH", "MATRIX", "VARIABLES", "STACK", "SYSTEM".
+You are an expert algorithmic analyzer.
+Analyze the following source code and classify it into one of the supported visualizer layout types:
+"ARRAY", "STACK", "LINKED_LIST", "TREE", "GRAPH", "MATRIX", "SYSTEM", "VARIABLES".
 
-Analyze what the code is doing, pick the best layout, define the initial data structure, and then trace the variables/pointers line by line.
+FEW-SHOT EXAMPLES:
+1. Two sum with arrays:
+def twoSum(arr, target):
+    left, right = 0, len(arr) - 1
+    ...
+-> Output: { "layout": "ARRAY", "confidence": 0.95, "reasoning": "Standard array indexing and two pointers" }
 
-CRITICAL INSTRUCTIONS:
-- Trace the code EXACTLY as a computer would. YOU MUST NOT SKIP ANY ITERATIONS. 
-- Never summarize the execution. Go step-by-step through the entire loop until the code naturally returns.
-- Look at the actual data structure values before deciding which if/else branch to take.
-- Line numbers MUST perfectly match the 1-indexed line numbers of the provided code block. Double check your line numbers.
-- For a while/for loop, trace the loop evaluation line, then the inner lines, then the loop evaluation line again for each iteration.
-- If a pointer/index goes out of bounds or becomes null, set its value to -1 or "null".
-- RANGE LOOPS MANDATORY RULE: If the code uses a loop to iterate over a range of numbers (e.g. "for i in range(start, end)" or a standard for loop), you MUST use the "ARRAY" layout. The "initial_data" MUST be the complete array of numbers in that range (e.g. [9, 10, 11, 12, 13, 14, 15, 16, 17]). The loop variable (e.g. "i") MUST be a pointer representing the INDEX of the current number in the initial_data array, NOT the value itself (e.g. if i is 10, the pointer points to index 1). DO NOT use the "VARIABLES" layout for code that loops over ranges of numbers!
+2. Invert binary tree:
+function invertTree(node) {
+    if (!node) return null;
+    let temp = node.left;
+    node.left = invertTree(node.right);
+    ...
+-> Output: { "layout": "TREE", "confidence": 0.98, "reasoning": "Binary tree node inversion with left and right children" }
 
-DATA SCHEMAS based on layout_type:
-- ARRAY or LINKED_LIST or STACK: "initial_data": [10, 20, 30] (array of values). Pointers point to indices. STACK is for Monotonic Stacks. (If the code iterates over a range of numbers, use ARRAY layout and set initial_data to the array of numbers in that range, and set the pointer to the index of the current number).
-- TREE: "initial_data": [{ "id": "n1", "val": 10, "left": "n2", "right": "n3" }, { "id": "n2", "val": 5 }]. "root_id": "n1". Pointers point to "id" strings!
-- GRAPH: "initial_data": { "nodes": [{ "id": "A", "val": 1 }], "edges": [["A", "B"]] }. Pointers point to "id" strings!
-- MATRIX: "initial_data": [[" ", " "], [" ", " "]]. Trace step can optionally include "matrix_state" to reflect changes. Pointers point to [row, col] coordinates!
-- SYSTEM: "initial_data": [{"id": "app", "type": "server", "label": "App", "color": "blue"}, {"id": "db", "type": "database", "label": "DB", "color": "green"}]. Trace step includes "active_flow": {"from": "app", "to": "db", "label": "Query DB"}
+3. Monotonic Stack example:
+def nextGreater(nums):
+    stack = []
+    for num in nums:
+        while stack and stack[-1] < num:
+            stack.pop()
+    ...
+-> Output: { "layout": "STACK", "confidence": 0.92, "reasoning": "Monotonic stack operations push/pop" }
 
-The JSON MUST exactly match this format:
-{
-  "layout_type": "ARRAY" | "LINKED_LIST" | "TREE" | "GRAPH" | "MATRIX" | "VARIABLES" | "STACK" | "SYSTEM",
-  "root_id": "<only_if_tree>",
-  "initial_data": <depends_on_schema_above>,
-  "trace": [
-    {
-      "line": <line_number>,
-      "matrix_state": <optional_updated_2d_array_for_matrix>,
-      "visited_nodes": <optional_array_of_visited_node_ids_for_tree_or_graph>,
-      "visited_edges": <optional_array_of_visited_edges_like_[["A","B"]]_for_tree_or_graph>,
-      "active_flow": <optional_flow_object_for_system_layout_like__{"from":"app","to":"db","label":"Write"}>,
-      "explanation": "<brief_description_of_step>",
-      "reasonTag": "<reason tag: 'new-min' | 'new-max-profit' | 'loop-check' | 'init' | 'other'>",
-      "pointers": { "<name>": <index_or_id_or_coordinate_array> },
-      "variables": { "<name>": "<value_as_string>" }
+4. Graph DFS:
+void dfs(int node, vector<int> adj[], vector<bool>& vis) {
+    vis[node] = true;
+    for(auto it: adj[node]) { ... }
+}
+-> Output: { "layout": "GRAPH", "confidence": 0.95, "reasoning": "Standard graph traversal on adjacency list" }
+
+5. Grid Search / Pathfinding:
+def uniquePaths(m, n):
+    grid = [[0]*n for _ in range(m)]
+    ...
+-> Output: { "layout": "MATRIX", "confidence": 0.96, "reasoning": "Grid/2D matrix paths" }
+
+6. Cache Aside Caching System:
+function getUser(id) {
+    let u = cache.get(id);
+    if (!u) {
+        u = db.get(id);
+        cache.set(id, u);
     }
-  ]
+    return u;
+}
+-> Output: { "layout": "SYSTEM", "confidence": 0.94, "reasoning": "Simulating App -> Cache -> DB architectural components" }
+
+Return a JSON object in this strict schema:
+{
+  "layout": "ARRAY" | "STACK" | "LINKED_LIST" | "TREE" | "GRAPH" | "MATRIX" | "SYSTEM" | "VARIABLES",
+  "confidence": number (between 0.0 and 1.0),
+  "reasoning": "string explanation"
 }
 
-Code to trace:
-${code.split('\n').map((l, i) => `${i + 1}: ${l}`).join('\n')}
-
-${customInput ? `CRITICAL: If the code accepts an array/list as input, execute the main function using this exact input data: [${customInput}] and set initial_data to [${customInput}]. If the code does not process an array/list input (e.g. it only uses scalar values or ranges), ignore this custom input and select the best layout (e.g., ARRAY for ranges, where initial_data is the range array).` : ''}
+Code to classify:
+${code}
 `;
 
-  let rawText = "";
   try {
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 256,
       }
     });
-    
-    rawText = result.response.text();
-    // Sometimes Gemini wraps JSON in markdown blocks even when responseMimeType is set
-    rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-    return JSON.parse(rawText);
-  } catch (error) {
-    console.error("AI Generation Failed:", error, rawText);
-    throw new Error(`Failed to trace code: ${error.message || "Invalid output from AI"}`);
+
+    let text = result.response.text();
+    text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const data = JSON.parse(text);
+    if (data.confidence < 0.6) {
+      return { layout: "VARIABLES", confidence: 1.0, reasoning: "Low confidence classification fallback" };
+    }
+    return data;
+  } catch (e) {
+    console.error("Layout classification failed, falling back to VARIABLES:", e);
+    return { layout: "VARIABLES", confidence: 1.0, reasoning: "Error classification fallback" };
   }
+};
+
+/**
+ * Stage 4: Generates natural language explanations in batches of 10 steps to save quota.
+ */
+export const generateNarratives = async (apiKey, code, trace) => {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+
+  const batchSize = 10;
+  const batches = [];
+  for (let i = 0; i < trace.length; i += batchSize) {
+    batches.push(trace.slice(i, i + batchSize));
+  }
+
+  const promises = batches.map(async (batch) => {
+    const prompt = `
+You are an algorithmic visualizer narrating a step-by-step code execution trace.
+Given the source code and a batch of real execution trace steps (line numbers and variable snapshots), write a short, clear, 1-sentence plain English explanation of what happens in each step.
+
+CRITICAL INSTRUCTIONS:
+- Do not compute new values. ONLY describe what already happened or is being checked in the given step.
+- Ground your explanations strictly in the variables provided.
+- Keep descriptions short, clear, and focused on the code logic at that line.
+- The output MUST be a JSON array of strings, where each element corresponds to the explanation for the respective step in the batch.
+
+Source Code:
+${code.split('\n').map((l, idx) => `${idx + 1}: ${l}`).join('\n')}
+
+Batch of steps to explain:
+${JSON.stringify(batch.map(s => ({ step: s.step, line: s.line, variables: s.variables })), null, 2)}
+
+Return a strict JSON array of strings:
+[
+  "Explanation for first step in batch...",
+  "Explanation for second step in batch..."
+]
+`;
+
+    try {
+      const result = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.1,
+          maxOutputTokens: 2048,
+        }
+      });
+
+      let text = result.response.text();
+      text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const explanations = JSON.parse(text);
+      if (Array.isArray(explanations)) {
+        batch.forEach((step, idx) => {
+          step.explanation = explanations[idx] || "Executing statement...";
+        });
+      }
+    } catch (e) {
+      console.error("Batch explanation failed:", e);
+      batch.forEach(step => {
+        step.explanation = `Line ${step.line}: variables are ${JSON.stringify(step.variables)}`;
+      });
+    }
+  });
+
+  await Promise.all(promises);
+};
+
+/**
+ * Main entry point: Executes the 5-stage pipeline for tracing and visual mapping.
+ */
+export const generateExecutionTrace = async (apiKey, code, customInput = null) => {
+  if (!apiKey) throw new Error("API Key is missing");
+
+  // Stage 1: Layout Classification
+  const classification = await classifyLayout(apiKey, code);
+  const layout = classification.layout;
+
+  // Detect language
+  const isPython = code.includes('def ') || code.includes('import ') || code.includes('print(');
+
+  let rawTrace = [];
+  let rawInitialData = [];
+
+  // Stage 2: Sandbox Execution Tracing
+  try {
+    if (isPython) {
+      const data = await runPythonSandbox(code, customInput);
+      rawTrace = data.trace;
+      rawInitialData = data.initial_data;
+    } else {
+      const instrumented = instrumentJS(code, customInput);
+      const data = await runJSSandbox(instrumented);
+      rawTrace = data.trace;
+      rawInitialData = data.initial_data;
+    }
+  } catch (err) {
+    throw new Error(`Execution error: ${err.message}`);
+  }
+
+  if (!rawTrace || rawTrace.length === 0) {
+    throw new Error("Execution trace is empty. Ensure your code executes successfully.");
+  }
+
+  // Stage 3: Structure and Pointer Mapping
+  const mapped = mapStructure(layout, rawTrace, rawInitialData);
+
+  // Stage 4: Natural Language Narrative Explanations
+  await generateNarratives(apiKey, code, mapped.trace);
+
+  // Return formatted results adhering to contract
+  return {
+    layout_type: layout,
+    confidence: classification.confidence,
+    root_id: layout === 'TREE' ? 'node_1' : undefined,
+    initial_data: mapped.initial_data,
+    trace: mapped.trace
+  };
 };

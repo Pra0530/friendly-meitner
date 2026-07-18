@@ -1,49 +1,88 @@
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import dagre from 'dagre';
 
 const POINTER_COLORS = ['var(--accent-color)', 'var(--success-color)', 'var(--warning-color)', 'var(--danger-color)'];
 
 const TreeLayout = ({ initial_data, root_id, pointers, currentState }) => {
   const visitedNodes = currentState?.visited_nodes || [];
   const visitedEdges = currentState?.visited_edges || [];
+
   const { nodes, edges, positions } = useMemo(() => {
     if (!initial_data || !Array.isArray(initial_data)) return { nodes: [], edges: [], positions: {} };
 
     const nodeMap = {};
     initial_data.forEach(n => nodeMap[n.id] = n);
 
-    const pos = {};
     const edgeList = [];
-    
-    // Recursive function to assign positions
-    const traverse = (nodeId, x, y, horizontalSpacing) => {
-      if (!nodeId || !nodeMap[nodeId]) return;
-      
-      pos[nodeId] = { x, y };
-      
+    const visited = new Set();
+
+    // Helper to traverse and collect edges (to avoid cycles causing infinite recursion)
+    const collectEdges = (nodeId) => {
+      if (!nodeId || visited.has(nodeId) || !nodeMap[nodeId]) return;
+      visited.add(nodeId);
+
       const node = nodeMap[nodeId];
-      if (node.left) {
+      if (node.left && nodeMap[node.left]) {
         edgeList.push({ from: nodeId, to: node.left });
-        traverse(node.left, x - horizontalSpacing, y + 80, horizontalSpacing / 1.8);
+        collectEdges(node.left);
       }
-      if (node.right) {
+      if (node.right && nodeMap[node.right]) {
         edgeList.push({ from: nodeId, to: node.right });
-        traverse(node.right, x + horizontalSpacing, y + 80, horizontalSpacing / 1.8);
+        collectEdges(node.right);
       }
     };
 
     if (root_id) {
-      traverse(root_id, 300, 40, 120); // Center of 600px canvas
+      collectEdges(root_id);
+    } else if (initial_data.length > 0) {
+      // Fallback: collect edges from first node
+      collectEdges(initial_data[0].id);
     }
+
+    // Configure dagre layout
+    const g = new dagre.graphlib.Graph();
+    g.setGraph({ 
+      rankdir: 'TB', 
+      nodesep: 40, 
+      ranksep: 60,
+      marginx: 50,
+      marginy: 50
+    });
+    g.setDefaultEdgeLabel(() => ({}));
+
+    // Add nodes to graph
+    initial_data.forEach(node => {
+      g.setNode(node.id, { width: 48, height: 48 });
+    });
+
+    // Add edges to graph
+    edgeList.forEach(edge => {
+      g.setEdge(edge.from, edge.to);
+    });
+
+    // Run layout computation
+    dagre.layout(g);
+
+    const pos = {};
+    g.nodes().forEach(v => {
+      const nodeLayout = g.node(v);
+      if (nodeLayout) {
+        pos[v] = {
+          x: nodeLayout.x - 24, // Center offset
+          y: nodeLayout.y - 24
+        };
+      }
+    });
 
     return { nodes: initial_data, edges: edgeList, positions: pos };
   }, [initial_data, root_id]);
 
   return (
-    <div style={{ position: 'relative', width: '600px', height: '400px', margin: '0 auto' }}>
+    <div style={{ position: 'relative', width: '600px', height: '400px', margin: '0 auto', overflow: 'auto' }}>
       
       {/* SVG for Edges */}
-      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
+      <svg style={{ position: 'absolute', inset: 0, width: '1000px', height: '1000px', pointerEvents: 'none', zIndex: 1 }}>
         {edges.map((edge, i) => {
           const fromPos = positions[edge.from];
           const toPos = positions[edge.to];
@@ -57,11 +96,11 @@ const TreeLayout = ({ initial_data, root_id, pointers, currentState }) => {
           return (
             <line 
               key={i}
-              x1={fromPos.x + 24} // center of 48px node
+              x1={fromPos.x + 24} // Center of 48px node
               y1={fromPos.y + 24} 
               x2={toPos.x + 24} 
               y2={toPos.y + 24} 
-              stroke={isVisited ? "var(--success-color)" : "var(--text-muted)"}
+              stroke={isVisited ? "var(--success-color)" : "var(--border-glass)"}
               strokeWidth={isVisited ? "4" : "2"}
               style={{ transition: 'all 0.3s ease' }}
             />
@@ -95,7 +134,7 @@ const TreeLayout = ({ initial_data, root_id, pointers, currentState }) => {
                     style={{ 
                       left: '24px', 
                       marginLeft: '-24px',
-                      top: `-${30 + pIndex * 26}px`, // Stack upwards to prevent overlap
+                      top: `-${30 + pIndex * 26}px`, // Stack pointers to avoid overlap
                       color: color,
                       background: `color-mix(in srgb, ${color} 15%, transparent)`,
                       borderColor: `color-mix(in srgb, ${color} 30%, transparent)`,
@@ -115,7 +154,7 @@ const TreeLayout = ({ initial_data, root_id, pointers, currentState }) => {
                 width: '48px',
                 height: '48px',
                 minWidth: '48px',
-                borderRadius: '50%', // Circle for trees
+                borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

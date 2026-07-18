@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import dagre from 'dagre';
 
 const POINTER_COLORS = ['var(--accent-color)', 'var(--success-color)', 'var(--warning-color)', 'var(--danger-color)'];
 
@@ -8,34 +9,56 @@ const GraphLayout = ({ initial_data, pointers, currentState }) => {
   const visitedEdges = currentState?.visited_edges || [];
 
   const { nodes, edges, positions } = useMemo(() => {
-    if (!initial_data || !initial_data.nodes || !initial_data.edges) return { nodes: [], edges: [], positions: {} };
+    if (!initial_data || !initial_data.nodes || !initial_data.edges) {
+      return { nodes: [], edges: [], positions: {} };
+    }
 
     const nodesList = initial_data.nodes;
     const edgeList = initial_data.edges;
+
+    // Configure dagre graph
+    const g = new dagre.graphlib.Graph();
+    g.setGraph({ 
+      rankdir: 'LR', // Left to Right looks great for general graphs
+      nodesep: 50, 
+      ranksep: 70,
+      marginx: 50,
+      marginy: 50
+    });
+    g.setDefaultEdgeLabel(() => ({}));
+
+    // Add nodes
+    nodesList.forEach(node => {
+      g.setNode(node.id, { width: 48, height: 48 });
+    });
+
+    // Add edges
+    edgeList.forEach(edge => {
+      g.setEdge(edge[0], edge[1]);
+    });
+
+    // Compute layout
+    dagre.layout(g);
+
     const pos = {};
-
-    // Circular layout
-    const centerX = 300;
-    const centerY = 200;
-    const radius = 120;
-    const n = nodesList.length;
-
-    nodesList.forEach((node, i) => {
-      const angle = (i / n) * 2 * Math.PI - Math.PI / 2; // start at top
-      pos[node.id] = {
-        x: centerX + radius * Math.cos(angle) - 24, // subtract half width to center
-        y: centerY + radius * Math.sin(angle) - 24
-      };
+    g.nodes().forEach(v => {
+      const nodeLayout = g.node(v);
+      if (nodeLayout) {
+        pos[v] = {
+          x: nodeLayout.x - 24, // Center offset
+          y: nodeLayout.y - 24
+        };
+      }
     });
 
     return { nodes: nodesList, edges: edgeList, positions: pos };
   }, [initial_data]);
 
   return (
-    <div style={{ position: 'relative', width: '600px', height: '400px', margin: '0 auto' }}>
+    <div style={{ position: 'relative', width: '600px', height: '400px', margin: '0 auto', overflow: 'auto' }}>
       
       {/* SVG for Edges */}
-      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
+      <svg style={{ position: 'absolute', inset: 0, width: '1000px', height: '1000px', pointerEvents: 'none', zIndex: 1 }}>
         {edges.map((edge, i) => {
           const fromPos = positions[edge[0]];
           const toPos = positions[edge[1]];
@@ -49,11 +72,11 @@ const GraphLayout = ({ initial_data, pointers, currentState }) => {
           return (
             <line 
               key={i}
-              x1={fromPos.x + 24} // center of 48px node
+              x1={fromPos.x + 24} // Center of 48px node
               y1={fromPos.y + 24} 
               x2={toPos.x + 24} 
               y2={toPos.y + 24} 
-              stroke={isVisited ? "var(--success-color)" : "var(--text-muted)"}
+              stroke={isVisited ? "var(--success-color)" : "var(--border-glass)"}
               strokeWidth={isVisited ? "4" : "2"}
               style={{ transition: 'all 0.3s ease' }}
             />
@@ -87,7 +110,7 @@ const GraphLayout = ({ initial_data, pointers, currentState }) => {
                     style={{ 
                       left: '24px', 
                       marginLeft: '-24px',
-                      top: `-${30 + pIndex * 26}px`, // Stack upwards to prevent overlap
+                      top: `-${30 + pIndex * 26}px`, // Stack pointers to avoid overlap
                       color: color,
                       background: `color-mix(in srgb, ${color} 15%, transparent)`,
                       borderColor: `color-mix(in srgb, ${color} 30%, transparent)`,
@@ -107,7 +130,7 @@ const GraphLayout = ({ initial_data, pointers, currentState }) => {
                 width: '48px',
                 height: '48px',
                 minWidth: '48px',
-                borderRadius: '50%', // Circle for graphs
+                borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

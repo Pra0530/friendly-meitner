@@ -119,9 +119,9 @@ const SystemLayout = ({ initial_data, currentState }) => {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                border: \`2px solid \${nodeColor}\`,
+                border: `2px solid ${nodeColor}`,
                 background: 'var(--bg-surface)',
-                boxShadow: isSource || isTarget ? \`0 0 20px \${nodeColor}40\` : '0 4px 12px rgba(0,0,0,0.3)',
+                boxShadow: isSource || isTarget ? `0 0 20px ${nodeColor}40` : '0 4px 12px rgba(0,0,0,0.3)',
                 color: nodeColor,
                 transition: 'all 0.3s ease',
                 gap: '8px'
