@@ -36,6 +36,84 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
     import('prismjs/components/prism-python');
   }, []);
 
+  const handleKeyDown = (e) => {
+    const textarea = e.target;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const val = textarea.value;
+
+    // 1. Bracket & Quote Auto-closing
+    const pairs = {
+      '{': '}',
+      '[': ']',
+      '(': ')',
+      '"': '"',
+      "'": "'",
+      '`': '`'
+    };
+
+    if (pairs[e.key] !== undefined) {
+      e.preventDefault();
+      const closingChar = pairs[e.key];
+      const newCode = val.substring(0, start) + e.key + closingChar + val.substring(end);
+      setCode(newCode);
+      if (onCodeChange) onCodeChange(newCode);
+      
+      // Reposition cursor inside brackets/quotes
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 1;
+      }, 0);
+      return;
+    }
+
+    // 2. Overwriting auto-closed brackets/quotes
+    const closingChars = new Set(['}', ']', ')', '"', "'", '`']);
+    if (closingChars.has(e.key) && val[start] === e.key) {
+      e.preventDefault();
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 1;
+      }, 0);
+      return;
+    }
+
+    // 3. Backspacing an auto-closed bracket pair
+    if (e.key === 'Backspace' && start === end) {
+      const charBefore = val[start - 1];
+      const charAfter = val[start];
+      if (pairs[charBefore] === charAfter) {
+        e.preventDefault();
+        const newCode = val.substring(0, start - 1) + val.substring(start + 1);
+        setCode(newCode);
+        if (onCodeChange) onCodeChange(newCode);
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = start - 1;
+        }, 0);
+        return;
+      }
+    }
+
+    // 4. Auto-indentation on Enter
+    if (e.key === 'Enter' && start === end) {
+      const linesBefore = val.substring(0, start).split('\n');
+      const currentLine = linesBefore[linesBefore.length - 1];
+      const indentMatch = currentLine.match(/^(\s*)/);
+      const indent = indentMatch ? indentMatch[1] : '';
+
+      const trimmedLine = currentLine.trim();
+      const extraIndent = (trimmedLine.endsWith('{') || trimmedLine.endsWith(':') || trimmedLine.endsWith('[')) ? '  ' : '';
+
+      e.preventDefault();
+      const newCode = val.substring(0, start) + '\n' + indent + extraIndent + val.substring(start);
+      setCode(newCode);
+      if (onCodeChange) onCodeChange(newCode);
+
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 1 + indent.length + extraIndent.length;
+      }, 0);
+      return;
+    }
+  };
+
   const EditorComponent = Editor.default || Editor;
 
   return (
@@ -63,8 +141,13 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
           ref={bgRef}
           style={{ 
             position: 'absolute', 
-            inset: 0, 
-            padding: '16px', 
+            top: 0,
+            bottom: 0,
+            left: '36px',
+            right: 0,
+            paddingTop: '16px', 
+            paddingBottom: '16px', 
+            paddingLeft: '12px',
             overflow: 'hidden', 
             pointerEvents: 'none', 
             zIndex: 1 
@@ -76,9 +159,9 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
               style={{ 
                 height: '21px', // Enforced line height
                 width: '1000%',
-                marginLeft: '-16px',
-                paddingLeft: '16px',
-                background: (activeLine - 1) === index ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
+                marginLeft: '-12px',
+                paddingLeft: '12px',
+                background: (activeLine - 1) === index ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
                 borderLeft: (activeLine - 1) === index ? '3px solid var(--accent-color)' : '3px solid transparent',
                 transition: 'all 0.2s ease'
               }}
@@ -88,35 +171,73 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
 
         {/* Real Syntax Highlighted Editor */}
         <div 
-          style={{ position: 'absolute', inset: 0, zIndex: 2, overflow: 'auto' }} 
+          style={{ position: 'absolute', inset: 0, zIndex: 2, overflow: 'auto', display: 'flex' }} 
           onScroll={handleScroll}
         >
-          <EditorComponent
-            value={code}
-            onValueChange={newCode => {
-              setCode(newCode);
-              if (onCodeChange) onCodeChange(newCode);
-            }}
-            highlight={code => {
-              const grammar = Prism.languages.javascript || Prism.languages.js;
-              if (grammar) {
-                try {
-                  return Prism.highlight(code, grammar, 'javascript');
-                } catch (e) {
-                  return code;
+          {/* Gutter / Line Numbers */}
+          <div style={{
+            position: 'sticky',
+            left: 0,
+            width: '36px',
+            background: '#141414',
+            borderRight: '1px solid var(--border-glass)',
+            paddingTop: '16px',
+            paddingBottom: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            paddingRight: '8px',
+            userSelect: 'none',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '12px',
+            lineHeight: '21px',
+            zIndex: 4,
+            height: 'fit-content',
+            color: '#4a5568'
+          }}>
+            {Array.from({ length: lines.length }).map((_, idx) => (
+              <div key={idx} style={{ 
+                color: (activeLine - 1) === idx ? 'var(--accent-color)' : '#4a5568',
+                fontWeight: (activeLine - 1) === idx ? 'bold' : 'normal'
+              }}>
+                {idx + 1}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ flex: 1, position: 'relative' }}>
+            <EditorComponent
+              value={code}
+              onValueChange={newCode => {
+                setCode(newCode);
+                if (onCodeChange) onCodeChange(newCode);
+              }}
+              highlight={code => {
+                const grammar = Prism.languages.javascript || Prism.languages.js;
+                if (grammar) {
+                  try {
+                    return Prism.highlight(code, grammar, 'javascript');
+                  } catch (e) {
+                    return code;
+                  }
                 }
-              }
-              return code;
-            }}
-            padding={16}
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 14,
-              lineHeight: '21px',
-              minHeight: '100%',
-              outline: 'none'
-            }}
-          />
+                return code;
+              }}
+              onKeyDown={handleKeyDown}
+              padding={0}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 14,
+                lineHeight: '21px',
+                minHeight: '100%',
+                outline: 'none',
+                paddingTop: '16px',
+                paddingBottom: '16px',
+                paddingLeft: '12px',
+                paddingRight: '16px'
+              }}
+            />
+          </div>
         </div>
       </div>
       
