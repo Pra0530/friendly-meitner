@@ -15,74 +15,44 @@ const TreeLayout = ({ initial_data, root_id, pointers, currentState }) => {
     initial_data.forEach(n => nodeMap[n.id] = n);
 
     const edgeList = [];
+    const pos = {};
     const visited = new Set();
 
-    // Helper to traverse and collect edges (to avoid cycles causing infinite recursion)
-    const collectEdges = (nodeId) => {
+    // Helper to calculate coordinates recursively
+    const layoutTree = (nodeId, x, y, level) => {
       if (!nodeId || visited.has(nodeId) || !nodeMap[nodeId]) return;
       visited.add(nodeId);
 
       const node = nodeMap[nodeId];
+      pos[nodeId] = { x, y };
+
+      // Horizontal offset decreases as tree depth increases to prevent subtree overlap
+      const offset = 140 / Math.pow(1.5, level);
+
       if (node.left && nodeMap[node.left]) {
         edgeList.push({ from: nodeId, to: node.left });
-        collectEdges(node.left);
+        layoutTree(node.left, x - offset, y + 80, level + 1);
       }
       if (node.right && nodeMap[node.right]) {
         edgeList.push({ from: nodeId, to: node.right });
-        collectEdges(node.right);
+        layoutTree(node.right, x + offset, y + 80, level + 1);
       }
     };
 
-    if (root_id) {
-      collectEdges(root_id);
-    } else if (initial_data.length > 0) {
-      // Fallback: collect edges from first node
-      collectEdges(initial_data[0].id);
+    const rootId = root_id || (initial_data.length > 0 ? initial_data[0].id : null);
+    if (rootId) {
+      // Center the root at x = 300, y = 40 (inside 600px container)
+      layoutTree(rootId, 300, 40, 1);
     }
-
-    // Configure dagre layout
-    const g = new dagre.graphlib.Graph();
-    g.setGraph({ 
-      rankdir: 'TB', 
-      nodesep: 40, 
-      ranksep: 60,
-      marginx: 50,
-      marginy: 50
-    });
-    g.setDefaultEdgeLabel(() => ({}));
-
-    // Add nodes to graph
-    initial_data.forEach(node => {
-      g.setNode(node.id, { width: 48, height: 48 });
-    });
-
-    // Add edges to graph
-    edgeList.forEach(edge => {
-      g.setEdge(edge.from, edge.to);
-    });
-
-    // Run layout computation
-    dagre.layout(g);
-
-    const pos = {};
-    g.nodes().forEach(v => {
-      const nodeLayout = g.node(v);
-      if (nodeLayout) {
-        pos[v] = {
-          x: nodeLayout.x - 24, // Center offset
-          y: nodeLayout.y - 24
-        };
-      }
-    });
 
     return { nodes: initial_data, edges: edgeList, positions: pos };
   }, [initial_data, root_id]);
 
   return (
-    <div style={{ position: 'relative', width: '600px', height: '400px', margin: '0 auto', overflow: 'auto' }}>
+    <div style={{ position: 'relative', width: '600px', height: '360px', margin: '0 auto', overflow: 'hidden' }}>
       
       {/* SVG for Edges */}
-      <svg style={{ position: 'absolute', inset: 0, width: '1000px', height: '1000px', pointerEvents: 'none', zIndex: 1 }}>
+      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
         {edges.map((edge, i) => {
           const fromPos = positions[edge.from];
           const toPos = positions[edge.to];
