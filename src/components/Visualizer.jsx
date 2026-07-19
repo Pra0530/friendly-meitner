@@ -7,6 +7,7 @@ import MatrixLayout from './layouts/MatrixLayout';
 import StackLayout from './layouts/StackLayout';
 import GraphLayout from './layouts/GraphLayout';
 import SystemLayout from './layouts/SystemLayout';
+import VariablesLayout from './layouts/VariablesLayout';
 import TraceLog from './TraceLog';
 import PlaybackControls from './PlaybackControls';
 import VariablePanel from './VariablePanel';
@@ -107,32 +108,43 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
         setPlaybackSpeed={setPlaybackSpeed}
       />
 
-      {/* Variables Display */}
-      <VariablePanel traceHistory={trace.slice(0, step + 1)} currentVariables={variables} />
+      {/* Variables Display — hidden for VARIABLES layout (shown inside canvas instead) */}
+      {layout_type !== 'variables' && (
+        <VariablePanel traceHistory={trace.slice(0, step + 1)} currentVariables={variables} />
+      )}
 
       {/* Insight Panel */}
       <InsightPanel insight={insight} />
 
       {/* Dynamic Layout Canvas */}
-      <div className="canvas-area" style={{ overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      {layout_type === 'array' || layout_type === 'linked_list' ? (
-        <ArrayLayout initial_data={initial_data} layout_type={layout_type} pointers={pointers} traceHistory={trace.slice(0, step + 1)} />
-      ) : layout_type === 'tree' ? (
-        <TreeLayout initial_data={initial_data} root_id={root_id} pointers={pointers} currentState={currentState} />
-      ) : layout_type === 'graph' ? (
-        <GraphLayout initial_data={initial_data} pointers={pointers} currentState={currentState} />
-      ) : layout_type === 'matrix' ? (
-        <MatrixLayout initial_data={initial_data} pointers={pointers} currentState={currentState} />
-      ) : layout_type === 'stack' ? (
-        <StackLayout initial_data={initial_data} pointers={pointers} traceHistory={trace.slice(0, step + 1)} />
-      ) : layout_type === 'system' ? (
-        <SystemLayout initial_data={initial_data} currentState={currentState} />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)', opacity: 0.5 }}>
-          <Zap size={48} style={{ marginBottom: '16px' }} />
-          <div>Simple Variable Execution</div>
-        </div>
-      )}
+      <div
+        className="canvas-area"
+        style={{
+          overflow: 'auto',
+          display: 'flex',
+          alignItems: layout_type === 'variables' ? 'flex-start' : 'center',
+          justifyContent: layout_type === 'variables' ? 'flex-start' : 'center',
+          width: '100%'
+        }}
+      >
+        {layout_type === 'array' || layout_type === 'linked_list' ? (
+          <ArrayLayout initial_data={initial_data} layout_type={layout_type} pointers={pointers} traceHistory={trace.slice(0, step + 1)} />
+        ) : layout_type === 'tree' ? (
+          <TreeLayout initial_data={initial_data} root_id={root_id} pointers={pointers} currentState={currentState} />
+        ) : layout_type === 'graph' ? (
+          <GraphLayout initial_data={initial_data} pointers={pointers} currentState={currentState} />
+        ) : layout_type === 'matrix' ? (
+          <MatrixLayout initial_data={initial_data} pointers={pointers} currentState={currentState} />
+        ) : layout_type === 'stack' ? (
+          <StackLayout initial_data={initial_data} pointers={pointers} traceHistory={trace.slice(0, step + 1)} />
+        ) : layout_type === 'system' ? (
+          <SystemLayout initial_data={initial_data} currentState={currentState} />
+        ) : (
+          // VARIABLES layout — rich code-aware step visualizer
+          <div style={{ width: '100%' }}>
+            <VariablesLayout currentState={currentState} trace={trace} step={step} />
+          </div>
+        )}
       </div>
 
       {step >= MAX_STEP && MAX_STEP > 0 && (

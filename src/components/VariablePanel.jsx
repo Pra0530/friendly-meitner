@@ -1,8 +1,19 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Names that come from the Python tracer / pyodide runtime — never show these
+const INTERNAL_VAR_NAMES = new Set([
+  'trace_steps','tracer','sys','json','object_ids','all_nodes',
+  'get_object_id','serialize_val','user_code_lines','user_code',
+  'blocked_modules','_pyodide_core','builtins','INTERNAL_NAMES',
+  'flat_nodes','result','mod','__name__','__doc__','__builtins__'
+]);
+
 const VariablePanel = ({ traceHistory, currentVariables }) => {
-  if (!currentVariables || Object.keys(currentVariables).length === 0) return null;
+  const filteredVars = Object.fromEntries(
+    Object.entries(currentVariables || {}).filter(([k]) => !INTERNAL_VAR_NAMES.has(k) && !k.startsWith('__'))
+  );
+  if (!filteredVars || Object.keys(filteredVars).length === 0) return null;
 
   // Compute history for each variable
   const variableHistory = {};
@@ -21,7 +32,7 @@ const VariablePanel = ({ traceHistory, currentVariables }) => {
 
   return (
     <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-      {Object.entries(currentVariables).map(([k, v]) => {
+      {Object.entries(filteredVars).map(([k, v]) => {
         const history = variableHistory[k] || [String(v)];
         const isNullOrUndefined = v === 'null' || v === 'undefined' || v === null;
         

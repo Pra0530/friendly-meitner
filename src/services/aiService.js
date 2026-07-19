@@ -77,58 +77,41 @@ export const classifyLayout = async (apiKey, code) => {
 
   const prompt = `
 You are an expert algorithmic analyzer.
-Analyze the following source code and classify it into one of the supported visualizer layout types:
-"ARRAY", "STACK", "LINKED_LIST", "TREE", "GRAPH", "MATRIX", "SYSTEM", "VARIABLES".
+Analyze the following source code and classify it into one of the supported visualizer layout types.
+
+LAYOUT TYPES:
+- "ARRAY": Code operates on an array/list with index pointers (two pointers, sliding window, binary search, etc.)
+- "STACK": Code uses an explicit stack data structure (push/pop operations)
+- "LINKED_LIST": Code traverses or builds a linked list with next pointers
+- "TREE": Code operates on binary trees or BSTs (left/right children)
+- "GRAPH": Code does DFS/BFS or operates on adjacency lists/matrices
+- "MATRIX": Code operates on a 2D grid or matrix
+- "SYSTEM": Code simulates architectural components (cache, queue, database, etc.)
+- "VARIABLES": Code has simple logic — conditionals, loops over primitives, arithmetic, print statements, basic variable manipulation. USE THIS when no complex data structure is involved.
 
 FEW-SHOT EXAMPLES:
-1. Two sum with arrays:
-def twoSum(arr, target):
-    left, right = 0, len(arr) - 1
-    ...
--> Output: { "layout": "ARRAY", "confidence": 0.95, "reasoning": "Standard array indexing and two pointers" }
+1. num=4; if num%2==0: print("even")
+-> { "layout": "VARIABLES", "confidence": 0.99, "reasoning": "Simple conditional on a primitive variable" }
 
-2. Invert binary tree:
-function invertTree(node) {
-    if (!node) return null;
-    let temp = node.left;
-    node.left = invertTree(node.right);
-    ...
--> Output: { "layout": "TREE", "confidence": 0.98, "reasoning": "Binary tree node inversion with left and right children" }
+2. for i in range(10): total += i
+-> { "layout": "VARIABLES", "confidence": 0.97, "reasoning": "Simple loop accumulating a primitive value" }
 
-3. Monotonic Stack example:
-def nextGreater(nums):
-    stack = []
-    for num in nums:
-        while stack and stack[-1] < num:
-            stack.pop()
-    ...
--> Output: { "layout": "STACK", "confidence": 0.92, "reasoning": "Monotonic stack operations push/pop" }
+3. def twoSum(arr, target): left, right = 0, len(arr)-1 ...
+-> { "layout": "ARRAY", "confidence": 0.95, "reasoning": "Array with two pointer indices" }
 
-4. Graph DFS:
-void dfs(int node, vector<int> adj[], vector<bool>& vis) {
-    vis[node] = true;
-    for(auto it: adj[node]) { ... }
-}
--> Output: { "layout": "GRAPH", "confidence": 0.95, "reasoning": "Standard graph traversal on adjacency list" }
+4. function invertTree(node) { if (!node) return null; let temp = node.left; ...
+-> { "layout": "TREE", "confidence": 0.98, "reasoning": "Binary tree node operations" }
 
-5. Grid Search / Pathfinding:
-def uniquePaths(m, n):
-    grid = [[0]*n for _ in range(m)]
-    ...
--> Output: { "layout": "MATRIX", "confidence": 0.96, "reasoning": "Grid/2D matrix paths" }
+5. def nextGreater(nums): stack = []; for num in nums: while stack and stack[-1] < num: stack.pop()
+-> { "layout": "STACK", "confidence": 0.92, "reasoning": "Monotonic stack operations" }
 
-6. Cache Aside Caching System:
-function getUser(id) {
-    let u = cache.get(id);
-    if (!u) {
-        u = db.get(id);
-        cache.set(id, u);
-    }
-    return u;
-}
--> Output: { "layout": "SYSTEM", "confidence": 0.94, "reasoning": "Simulating App -> Cache -> DB architectural components" }
+6. void dfs(int node, vector<int> adj[], vector<bool>& vis) { vis[node]=true; ...
+-> { "layout": "GRAPH", "confidence": 0.95, "reasoning": "Graph traversal on adjacency list" }
 
-Return a JSON object in this strict schema:
+7. def uniquePaths(m, n): grid = [[0]*n for _ in range(m)] ...
+-> { "layout": "MATRIX", "confidence": 0.96, "reasoning": "2D grid traversal" }
+
+Return ONLY a JSON object in this strict schema:
 {
   "layout": "ARRAY" | "STACK" | "LINKED_LIST" | "TREE" | "GRAPH" | "MATRIX" | "SYSTEM" | "VARIABLES",
   "confidence": number (between 0.0 and 1.0),

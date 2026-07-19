@@ -22,7 +22,9 @@ export const runPythonSandbox = async (code, customInput = null) => {
   const mainFuncName = defMatch ? defMatch[1] : null;
 
   // Check if the function is already invoked in the code
-  const isInvoked = mainFuncName ? new RegExp(`\\b${mainFuncName}\\s*\\(`).test(code.split('\n').slice(1).join('\n')) : false;
+  const isInvoked = mainFuncName
+    ? new RegExp(`\\b${mainFuncName}\\s*\\(`).test(code.split('\n').slice(1).join('\n'))
+    : false;
 
   let executionCode = code;
   if (customInput && mainFuncName) {
@@ -31,17 +33,27 @@ export const runPythonSandbox = async (code, customInput = null) => {
     executionCode += `\n\nprint(${mainFuncName}())`;
   }
 
-  // Escape backslashes and quotes for Python raw string execution
-  const escapedCode = executionCode.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+  // Escape for embedding in triple-quoted Python string
+  const escapedCode = executionCode
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$');
 
   const runnerScript = `
 import sys
 import json
 
-# Block dangerous imports to sandbox the execution
-blocked_modules = ['os', 'subprocess', 'socket', 'urllib', 'requests', 'shutil', 'builtins.eval']
-for mod in blocked_modules:
-    sys.modules[mod] = None
+# ── Internal names to ALWAYS strip from user variables ──────────────
+INTERNAL_NAMES = {
+  'trace_steps', 'tracer', 'sys', 'json',
+  'object_ids', 'all_nodes', 'get_object_id',
+  'serialize_val', 'user_code_lines', 'user_code',
+  'blocked_modules', '_pyodide_core', 'builtins',
+  'INTERNAL_NAMES', 'flat_nodes', 'result',
+  '__name__', '__doc__', '__package__', '__loader__',
+  '__spec__', '__builtins__', '__file__', '__cached__',
+  'mod'
+}
 
 trace_steps = []
 object_ids = {}
@@ -52,12 +64,10 @@ def get_object_id(obj):
         return None
     obj_id = id(obj)
     if obj_id not in object_ids:
-        # Check if it looks like a tree/list node object
         is_node_obj = False
         if not isinstance(obj, (int, float, str, bool, list, dict, set, tuple)):
             if hasattr(obj, 'val') or hasattr(obj, 'value') or hasattr(obj, 'left') or hasattr(obj, 'right') or hasattr(obj, 'next') or hasattr(obj, 'neighbors'):
                 is_node_obj = True
-        
         if is_node_obj:
             node_id = f"node_{len(object_ids) + 1}"
             object_ids[obj_id] = node_id
@@ -75,12 +85,9 @@ def serialize_val(val):
         return [serialize_val(x) for x in val]
     if isinstance(val, dict):
         return {k: serialize_val(v) for k, v in val.items()}
-    
-    # Check if node object
     node_id = get_object_id(val)
     if node_id and isinstance(node_id, str) and node_id.startswith("node_"):
         return node_id
-        
     try:
         json.dumps(val)
         return val
@@ -93,24 +100,33 @@ user_code_lines = user_code.split('\\n')
 def tracer(frame, event, arg):
     if event == 'line':
         line = frame.f_lineno
-        # Capture variables in local scope
         variables = {}
         for k, v in frame.f_locals.items():
-            if k.startswith('__') or k in ['trace_steps', 'tracer', 'sys', 'json', 'object_ids', 'all_nodes', 'get_object_id', 'serialize_val', 'user_code_lines']:
+            # ── Skip all internal / pyodide names ──
+            if k in INTERNAL_NAMES:
                 continue
-            variables[k] = serialize_val(v)
-        
-        # Determine stack depth
+            if k.startswith('__'):
+                continue
+            # Skip module objects (pyodide internals leak as modules)
+            if str(type(v)) == "<class 'module'>":
+                continue
+            # Skip callables that are not user-defined lambdas
+            if callable(v) and not (hasattr(v, '__name__') and not v.__name__.startswith('<')):
+                continue
+            try:
+                variables[k] = serialize_val(v)
+            except Exception:
+                pass
+
         depth = 0
         f = frame
         while f:
             depth += 1
             f = f.f_back
 
-        # Classify the statement type/action
         line_idx = line - 1
         line_str = user_code_lines[line_idx].strip() if 0 <= line_idx < len(user_code_lines) else ""
-        
+
         action = "assignment"
         if line_str.startswith(("if ", "elif ", "else:")):
             action = "condition"
@@ -118,27 +134,28 @@ def tracer(frame, event, arg):
             action = "loop"
         elif line_str.startswith("return"):
             action = "return"
-        elif "(" in line_str and ")" in line_str and not "=" in line_str:
+        elif "(" in line_str and ")" in line_str and "=" not in line_str:
             action = "call"
 
         trace_steps.append({
             "step": len(trace_steps),
             "line": line,
+            "line_text": line_str,
             "action": action,
             "variables": variables,
             "depth": depth
         })
     return tracer
 
-# Inject and run tracer
 sys.settrace(tracer)
 try:
-    exec(user_code, globals())
+    exec(user_code, {})
 except Exception as e:
     trace_steps.append({
         "step": len(trace_steps),
         "line": -1,
-        "action": "return",
+        "line_text": "",
+        "action": "error",
         "variables": {},
         "depth": 0,
         "error": str(e)
@@ -146,7 +163,6 @@ except Exception as e:
 finally:
     sys.settrace(None)
 
-# Flatten and extract node structures for initial_data
 flat_nodes = []
 for node in all_nodes:
     flat_nodes.append({
@@ -168,7 +184,6 @@ json.dumps(result)
   const resultJson = await pyodideInstance.runPythonAsync(runnerScript);
   const data = JSON.parse(resultJson);
 
-  // Check for runtime error in trace
   const errorStep = data.trace.find(step => step.error);
   if (errorStep) {
     throw new Error(errorStep.error);
