@@ -1,69 +1,65 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, GitBranch, RotateCcw, CheckCircle2, XCircle, Cpu } from 'lucide-react';
 
-/**
- * VariablesLayout — Beautiful step-by-step visualization for simple/conditional/loop code.
- * Shows: Variable memory cells, current line highlight, condition evaluation, branch flow.
- */
+const INTERNAL = new Set([
+  'trace_steps','tracer','sys','json','object_ids','all_nodes',
+  'get_object_id','serialize_val','user_code_lines','user_code',
+  'blocked_modules','_pyodide_core','builtins','INTERNAL_NAMES',
+  'flat_nodes','result','mod','__name__','__doc__','__builtins__'
+]);
+
 const VariablesLayout = ({ currentState, trace, step }) => {
-  const variables = currentState?.variables || {};
+  const vars = currentState?.variables || {};
   const action = currentState?.action || 'assignment';
   const lineText = currentState?.line_text || '';
-  const lineNum = currentState?.line || 0;
 
-  // Build ordered variable entries, filtering noise
-  const varEntries = Object.entries(variables).filter(([k]) =>
-    !k.startsWith('__') && k !== 'tracer' && k !== 'sys' && k !== 'json'
+  // Clean variables
+  const cleanVars = Object.entries(vars).filter(
+    ([k]) => !INTERNAL.has(k) && !k.startsWith('__')
   );
 
-  // Collect all variable names seen across all steps for stable ordering
-  const allVarNames = [];
-  const seen = new Set();
-  (trace || []).forEach(s => {
-    Object.keys(s.variables || {}).forEach(k => {
-      if (!seen.has(k)) { seen.add(k); allVarNames.push(k); }
-    });
-  });
-
-  // Detect if a condition was just evaluated — find nearest condition step at/before current
-  let conditionResult = null;
-  let conditionExpr = '';
-  for (let i = step; i >= 0; i--) {
-    const s = trace[i];
-    if (!s) continue;
-    if (s.action === 'condition') {
-      conditionExpr = s.line_text || '';
-      // The next step shows the branch taken — if it's deeper, condition was TRUE
-      const nextStep = trace[i + 1];
-      if (nextStep) {
-        conditionResult = nextStep.depth >= s.depth ? true : false;
-      }
-      break;
+  // Detect prev values for change animation
+  const getPrev = (key) => {
+    for (let i = step - 1; i >= 0; i--) {
+      const v = trace[i]?.variables?.[key];
+      if (v !== undefined) return v;
     }
-    if (s.action === 'assignment' || s.action === 'loop') break;
+    return undefined;
+  };
+
+  // Condition result: look at next step depth
+  let condResult = null;
+  if (action === 'condition') {
+    const next = trace[step + 1];
+    const curr = trace[step];
+    if (next && curr) condResult = next.depth >= curr.depth;
   }
 
-  // Collect output (print calls) — look for output in prior steps' line_text
+  // Collect all outputs seen so far (print calls)
   const outputs = [];
   for (let i = 0; i <= step; i++) {
     const s = trace[i];
-    if (s && s.action === 'call' && (s.line_text || '').includes('print(')) {
-      const match = (s.line_text || '').match(/print\((.*)\)/);
-      if (match) outputs.push(match[1]);
+    if (s?.action === 'call' && s?.line_text?.includes('print(')) {
+      const m = s.line_text.match(/print\((.+)\)/);
+      if (m) {
+        // Evaluate using current variables at that step
+        let out = m[1].replace(/["']/g, '');
+        // Check if it's a variable reference
+        const sv = s.variables?.[out.trim()];
+        if (sv !== undefined) out = String(sv);
+        outputs.push(out);
+      }
     }
   }
 
-  // Color per action
-  const actionColors = {
-    assignment: { bg: 'rgba(59, 130, 246, 0.12)', border: '#3b82f6', label: 'ASSIGN', icon: '=' },
-    condition: { bg: 'rgba(245, 158, 11, 0.12)', border: '#f59e0b', label: 'CHECK', icon: '?' },
-    loop: { bg: 'rgba(139, 92, 246, 0.12)', border: '#8b5cf6', label: 'LOOP', icon: '↺' },
-    call: { bg: 'rgba(16, 185, 129, 0.12)', border: '#10b981', label: 'CALL', icon: '→' },
-    return: { bg: 'rgba(239, 68, 68, 0.12)', border: '#ef4444', label: 'RETURN', icon: '⬅' },
-    error: { bg: 'rgba(239, 68, 68, 0.15)', border: '#ef4444', label: 'ERROR', icon: '✕' },
+  const actionMeta = {
+    assignment: { color: '#60a5fa', label: 'ASSIGN',   bg: 'rgba(96,165,250,0.10)' },
+    condition:  { color: '#fbbf24', label: 'CONDITION', bg: 'rgba(251,191,36,0.10)' },
+    loop:       { color: '#a78bfa', label: 'LOOP',      bg: 'rgba(167,139,250,0.10)' },
+    call:       { color: '#34d399', label: 'CALL',      bg: 'rgba(52,211,153,0.10)' },
+    return:     { color: '#f87171', label: 'RETURN',    bg: 'rgba(248,113,113,0.10)' },
   };
-  const actionStyle = actionColors[action] || actionColors.assignment;
+  const meta = actionMeta[action] || actionMeta.assignment;
 
   return (
     <div style={{
@@ -71,152 +67,226 @@ const VariablesLayout = ({ currentState, trace, step }) => {
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      gap: '16px',
-      padding: '8px 4px',
-      overflowY: 'auto'
+      gap: '20px',
+      padding: '8px 2px',
+      overflow: 'hidden'
     }}>
 
-      {/* ── Step Badge ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{
-          background: actionStyle.bg,
-          border: `1px solid ${actionStyle.border}`,
-          borderRadius: '8px',
-          padding: '6px 14px',
+      {/* ── Current Line Banner ── */}
+      <motion.div
+        key={`line-${step}`}
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+        style={{
+          background: meta.bg,
+          border: `1.5px solid ${meta.color}`,
+          borderRadius: '10px',
+          padding: '10px 16px',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: '12px',
+          flexShrink: 0
+        }}
+      >
+        <span style={{
+          background: meta.color,
+          color: '#000',
+          fontSize: '10px',
+          fontWeight: '800',
+          letterSpacing: '1px',
+          padding: '2px 8px',
+          borderRadius: '4px',
           flexShrink: 0
         }}>
-          <span style={{ color: actionStyle.border, fontWeight: 'bold', fontSize: '11px', letterSpacing: '1px' }}>
-            {actionStyle.icon} {actionStyle.label}
-          </span>
-        </div>
-        <div style={{
-          flex: 1,
-          background: 'rgba(255,255,255,0.03)',
-          border: `1px solid ${actionStyle.border}`,
-          borderRadius: '8px',
-          padding: '6px 14px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '13px',
+          {meta.label}
+        </span>
+        <code style={{
           color: '#e2e8f0',
-          whiteSpace: 'nowrap',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '14px',
+          flex: 1,
           overflow: 'hidden',
-          textOverflow: 'ellipsis'
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
         }}>
-          <span style={{ color: 'var(--text-muted)', marginRight: '8px', fontSize: '11px' }}>L{lineNum}</span>
           {lineText || '···'}
-        </div>
-      </div>
+        </code>
+        <span style={{ color: 'var(--text-muted)', fontSize: '11px', flexShrink: 0 }}>
+          line {currentState?.line}
+        </span>
+      </motion.div>
 
-      {/* ── Condition result banner ── */}
+      {/* ── Condition TRUE / FALSE ── */}
       <AnimatePresence mode="wait">
         {action === 'condition' && (
           <motion.div
             key={`cond-${step}`}
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 22 }}
             style={{
-              background: conditionResult === true
-                ? 'rgba(16, 185, 129, 0.12)'
-                : conditionResult === false
-                  ? 'rgba(239, 68, 68, 0.12)'
-                  : 'rgba(245, 158, 11, 0.12)',
-              border: `1px solid ${conditionResult === true ? '#10b981' : conditionResult === false ? '#ef4444' : '#f59e0b'}`,
-              borderRadius: '10px',
-              padding: '10px 16px',
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              fontSize: '14px',
-              fontFamily: 'var(--font-mono)'
+              justifyContent: 'center',
+              gap: '20px',
+              flexShrink: 0
             }}
           >
-            <GitBranch size={16} color={conditionResult === true ? '#10b981' : '#ef4444'} />
-            <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Condition</span>
-            <code style={{ color: '#e2e8f0', flex: 1 }}>{conditionExpr}</code>
-            {conditionResult === true && (
-              <span style={{ color: '#10b981', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CheckCircle2 size={14} /> TRUE
-              </span>
-            )}
-            {conditionResult === false && (
-              <span style={{ color: '#ef4444', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <XCircle size={14} /> FALSE
-              </span>
-            )}
+            {/* TRUE branch */}
+            <motion.div
+              animate={{
+                scale: condResult === true ? 1.12 : 0.9,
+                opacity: condResult === false ? 0.25 : 1,
+              }}
+              transition={{ duration: 0.3 }}
+              style={{
+                background: 'rgba(52,211,153,0.15)',
+                border: `2px solid ${condResult === true ? '#34d399' : 'rgba(52,211,153,0.2)'}`,
+                borderRadius: '12px',
+                padding: '14px 28px',
+                textAlign: 'center',
+                boxShadow: condResult === true ? '0 0 24px rgba(52,211,153,0.35)' : 'none'
+              }}
+            >
+              <div style={{ fontSize: '24px', marginBottom: '4px' }}>✓</div>
+              <div style={{ color: '#34d399', fontWeight: '700', fontSize: '15px' }}>TRUE</div>
+            </motion.div>
+
+            {/* Condition expression */}
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginBottom: '4px' }}>evaluating</div>
+              <code style={{
+                color: '#fbbf24',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '15px',
+                fontWeight: '600',
+                display: 'block',
+                maxWidth: '180px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {lineText}
+              </code>
+            </div>
+
+            {/* FALSE branch */}
+            <motion.div
+              animate={{
+                scale: condResult === false ? 1.12 : 0.9,
+                opacity: condResult === true ? 0.25 : 1,
+              }}
+              transition={{ duration: 0.3 }}
+              style={{
+                background: 'rgba(248,113,113,0.15)',
+                border: `2px solid ${condResult === false ? '#f87171' : 'rgba(248,113,113,0.2)'}`,
+                borderRadius: '12px',
+                padding: '14px 28px',
+                textAlign: 'center',
+                boxShadow: condResult === false ? '0 0 24px rgba(248,113,113,0.35)' : 'none'
+              }}
+            >
+              <div style={{ fontSize: '24px', marginBottom: '4px' }}>✗</div>
+              <div style={{ color: '#f87171', fontWeight: '700', fontSize: '15px' }}>FALSE</div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Variable Memory Cells ── */}
-      {varEntries.length > 0 && (
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+      {/* ── Memory Cells (Variable Boxes) ── */}
+      {cleanVars.length > 0 && (
+        <div style={{ flexShrink: 0 }}>
+          <div style={{
+            fontSize: '10px',
+            color: 'var(--text-muted)',
+            letterSpacing: '1.2px',
+            textTransform: 'uppercase',
+            marginBottom: '10px'
+          }}>
             Memory
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
             <AnimatePresence>
-              {allVarNames.filter(k => variables[k] !== undefined).map((k) => {
-                const v = variables[k];
+              {cleanVars.map(([k, v]) => {
+                const prev = getPrev(k);
+                const changed = prev !== undefined && String(prev) !== String(v);
                 const isArray = Array.isArray(v);
-                const isObj = v !== null && typeof v === 'object' && !isArray;
-                const displayVal = isArray
+                const display = isArray
                   ? `[${v.map(x => JSON.stringify(x)).join(', ')}]`
-                  : isObj
-                    ? JSON.stringify(v)
-                    : String(v);
-
-                // Find previous value for change detection
-                let prevVal = null;
-                for (let i = step - 1; i >= 0; i--) {
-                  const prev = trace[i]?.variables?.[k];
-                  if (prev !== undefined) { prevVal = prev; break; }
-                }
-                const changed = prevVal !== null && String(prevVal) !== String(v);
+                  : String(v);
 
                 return (
                   <motion.div
                     key={k}
                     layout
-                    initial={{ opacity: 0, scale: 0.85 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                    initial={{ opacity: 0, scale: 0.7, y: 20 }}
+                    animate={{
+                      opacity: 1,
+                      scale: 1,
+                      y: 0,
+                      borderColor: changed ? '#60a5fa' : 'rgba(255,255,255,0.08)',
+                      boxShadow: changed ? '0 0 20px rgba(96,165,250,0.4)' : '0 0 0px transparent'
+                    }}
+                    transition={{ type: 'spring', stiffness: 350, damping: 24 }}
                     style={{
-                      background: changed
-                        ? 'rgba(59, 130, 246, 0.15)'
-                        : 'var(--bg-surface)',
-                      border: `1.5px solid ${changed ? 'var(--accent-color)' : 'var(--border-glass)'}`,
-                      borderRadius: '10px',
-                      padding: '10px 16px',
+                      background: changed ? 'rgba(96,165,250,0.08)' : 'var(--bg-surface)',
+                      border: `2px solid ${changed ? '#60a5fa' : 'rgba(255,255,255,0.08)'}`,
+                      borderRadius: '12px',
+                      padding: '12px 20px',
                       minWidth: '80px',
-                      maxWidth: '200px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                      boxShadow: changed ? '0 0 12px rgba(59,130,246,0.2)' : 'none',
-                      transition: 'box-shadow 0.3s ease, border-color 0.3s ease'
+                      position: 'relative',
+                      overflow: 'hidden'
                     }}
                   >
-                    <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                      {k}
-                    </span>
-                    <span style={{
-                      color: changed ? 'var(--accent-color)' : '#e2e8f0',
+                    {/* Animated shimmer when changed */}
+                    {changed && (
+                      <motion.div
+                        initial={{ x: '-100%' }}
+                        animate={{ x: '200%' }}
+                        transition={{ duration: 0.6 }}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background: 'linear-gradient(90deg, transparent, rgba(96,165,250,0.2), transparent)',
+                          pointerEvents: 'none'
+                        }}
+                      />
+                    )}
+                    <div style={{
+                      color: 'var(--text-muted)',
+                      fontSize: '11px',
                       fontFamily: 'var(--font-mono)',
-                      fontSize: '16px',
-                      fontWeight: '700',
-                      wordBreak: 'break-all'
+                      marginBottom: '4px'
                     }}>
-                      {displayVal}
-                    </span>
-                    {changed && prevVal !== null && (
-                      <span style={{ color: 'var(--text-muted)', fontSize: '10px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <ArrowRight size={9} />
-                        was: {String(prevVal)}
-                      </span>
+                      {k}
+                    </div>
+                    <motion.div
+                      key={`${k}-${String(v)}`}
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      style={{
+                        color: changed ? '#60a5fa' : '#e2e8f0',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '20px',
+                        fontWeight: '800',
+                        lineHeight: 1
+                      }}
+                    >
+                      {display}
+                    </motion.div>
+                    {changed && prev !== undefined && (
+                      <div style={{
+                        color: 'var(--text-muted)',
+                        fontSize: '10px',
+                        fontFamily: 'var(--font-mono)',
+                        marginTop: '4px',
+                        textDecoration: 'line-through',
+                        opacity: 0.6
+                      }}>
+                        {String(prev)}
+                      </div>
                     )}
                   </motion.div>
                 );
@@ -226,78 +296,38 @@ const VariablesLayout = ({ currentState, trace, step }) => {
         </div>
       )}
 
-      {/* ── Execution Flow Timeline ── */}
-      <div>
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-          Execution Flow
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto' }}>
-          {(trace || []).slice(Math.max(0, step - 6), step + 1).map((s, i, arr) => {
-            const globalIdx = Math.max(0, step - 6) + i;
-            const isCurrent = globalIdx === step;
-            const sAction = s.action || 'assignment';
-            const aStyle = actionColors[sAction] || actionColors.assignment;
-
-            return (
-              <motion.div
-                key={globalIdx}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.03 }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '5px 10px',
-                  borderRadius: '6px',
-                  background: isCurrent ? aStyle.bg : 'transparent',
-                  border: `1px solid ${isCurrent ? aStyle.border : 'transparent'}`,
-                  opacity: isCurrent ? 1 : 0.45,
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <span style={{ color: aStyle.border, fontSize: '10px', width: '14px', textAlign: 'center' }}>
-                  {aStyle.icon}
-                </span>
-                <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px', width: '24px' }}>
-                  L{s.line}
-                </span>
-                <span style={{
-                  color: isCurrent ? '#e2e8f0' : 'var(--text-secondary)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '12px',
-                  flex: 1,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {s.line_text || '···'}
-                </span>
-              </motion.div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Output Panel (print statements) ── */}
+      {/* ── Output (print results) ── */}
       {outputs.length > 0 && (
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+        <div style={{ flexShrink: 0 }}>
+          <div style={{
+            fontSize: '10px',
+            color: 'var(--text-muted)',
+            letterSpacing: '1.2px',
+            textTransform: 'uppercase',
+            marginBottom: '10px'
+          }}>
             Output
           </div>
           <div style={{
-            background: '#050505',
-            border: '1px solid var(--border-glass)',
-            borderRadius: '8px',
-            padding: '10px 14px',
+            background: '#050507',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '10px',
+            padding: '12px 16px',
             fontFamily: 'var(--font-mono)',
-            fontSize: '13px'
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px'
           }}>
-            {outputs.map((out, i) => (
-              <div key={i} style={{ color: '#a3e635', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {outputs.map((o, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                style={{ display: 'flex', gap: '10px', color: '#a3e635', fontSize: '14px' }}
+              >
                 <span style={{ color: 'var(--text-muted)' }}>{'>'}</span>
-                <span>{out}</span>
-              </div>
+                <span>{o}</span>
+              </motion.div>
             ))}
           </div>
         </div>

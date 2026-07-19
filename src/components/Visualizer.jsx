@@ -116,15 +116,18 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
       {/* Insight Panel */}
       <InsightPanel insight={insight} />
 
-      {/* Dynamic Layout Canvas */}
+      {/* Dynamic Layout Canvas — must have flex:1 + minHeight:0 to fill space */}
       <div
         className="canvas-area"
         style={{
+          flex: 1,
+          minHeight: 0,
           overflow: 'auto',
           display: 'flex',
           alignItems: layout_type === 'variables' ? 'flex-start' : 'center',
           justifyContent: layout_type === 'variables' ? 'flex-start' : 'center',
-          width: '100%'
+          width: '100%',
+          padding: layout_type === 'variables' ? '4px 0' : '0'
         }}
       >
         {layout_type === 'array' || layout_type === 'linked_list' ? (
@@ -140,8 +143,7 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
         ) : layout_type === 'system' ? (
           <SystemLayout initial_data={initial_data} currentState={currentState} />
         ) : (
-          // VARIABLES layout — rich code-aware step visualizer
-          <div style={{ width: '100%' }}>
+          <div style={{ width: '100%', height: '100%' }}>
             <VariablesLayout currentState={currentState} trace={trace} step={step} />
           </div>
         )}
