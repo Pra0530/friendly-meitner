@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import CodeEditor from './components/CodeEditor';
 import Visualizer from './components/Visualizer';
 import QuestionBank from './components/QuestionBank';
-import InputEditor from './components/InputEditor';
+
 import CommandPalette from './components/CommandPalette';
 import FindReplace from './components/FindReplace';
 import TerminalEmulator from './components/TerminalEmulator';
@@ -211,11 +211,6 @@ function App() {
 
           {aiData ? (
             <>
-              <InputEditor
-                onRun={(customInput) => handlePlay(editorCode, customInput)}
-                isAnalyzing={isAnalyzing}
-                initialData={aiData?.initial_data}
-              />
 
               {/* ── Execution Error Banner ── */}
               {errorMessage && (
