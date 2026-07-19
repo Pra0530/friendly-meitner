@@ -12,27 +12,21 @@ const CodeEditor = ({
   onCodeChange,
   onDiagnosticsChange 
 }) => {
-  const DEFAULT_CODE = `// Hey AI, please trace this with a target value of 7
+  const DEFAULT_CODE = `// BST Search — complete, runnable example
 function searchBST(root, target) {
   let curr = root;
-  
+
   while (curr !== null) {
-    if (curr.val === target) {
-      return curr;
-    }
-    
-    // If target is smaller, go left
-    if (target < curr.val) {
-      curr = curr.left;
-    } 
-    // If target is larger, go right
-    else {
-      curr = curr.right;
-    }
+    if (curr.val === target) return curr;
+    if (target < curr.val) curr = curr.left;
+    else curr = curr.right;
   }
-  
   return null;
-}`;
+}
+
+// Build a sample BST: 4 -> left:2, right:7
+const root = { val: 4, left: { val: 2, left: null, right: null }, right: { val: 7, left: null, right: null } };
+searchBST(root, 7);`;
 
   const [code, setCode] = useState(DEFAULT_CODE);
   const [diagnostics, setDiagnostics] = useState([]);

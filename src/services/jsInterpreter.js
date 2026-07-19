@@ -200,9 +200,27 @@ export const instrumentJS = async (code, customInput = null) => {
 
   let instrumented = result.code;
 
+  // Detect param count of main function — don't auto-call if it needs args
+  let mainFuncParamCount = 0;
+  const plugin2 = ({ types: t }) => ({
+    visitor: {
+      FunctionDeclaration(path) {
+        if (path.node.id && path.node.id.name === mainFuncName) {
+          mainFuncParamCount = path.node.params.length;
+        }
+      }
+    }
+  });
+
+  // Run a quick param-count pass
+  try {
+    Babel.transform(code, { plugins: [plugin2] });
+  } catch (e) { /* ignore */ }
+
   if (customInput && mainFuncName) {
     instrumented += `\n;${mainFuncName}(${customInput});`;
-  } else if (!hasCallAtBottom && mainFuncName) {
+  } else if (!hasCallAtBottom && mainFuncName && mainFuncParamCount === 0) {
+    // Only auto-call zero-param functions — functions with params must be called manually
     instrumented += `\n;${mainFuncName}();`;
   }
 

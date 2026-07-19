@@ -28,6 +28,7 @@ function App() {
   const [editorInitialCode, setEditorInitialCode] = useState(null);
   const [editorCode, setEditorCode] = useState('');
   const [activeQuestion, setActiveQuestion] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null);
 
   // IDE UX feature states
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -109,13 +110,14 @@ function App() {
     if (!apiKey) { setIsKeyModalOpen(true); return; }
     setIsAnalyzing(true);
     setIsPlaying(false);
+    setErrorMessage(null);
     try {
       const data = await generateExecutionTrace(apiKey, codeToRun, customInput);
       setAiData(data);
       setStep(0);
       setIsPlaying(true);
     } catch (err) {
-      alert(err.message);
+      setErrorMessage(err.message);
     } finally {
       setIsAnalyzing(false);
     }
@@ -214,6 +216,36 @@ function App() {
             isAnalyzing={isAnalyzing}
             initialData={aiData?.initial_data}
           />
+
+          {/* ── Execution Error Banner ── */}
+          {errorMessage && (
+            <div style={{
+              flexShrink: 0,
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: '8px',
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              marginBottom: '8px'
+            }}>
+              <span style={{ color: '#ef4444', fontSize: '16px', flexShrink: 0 }}>✕</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: '#ef4444', fontWeight: '600', fontSize: '13px', marginBottom: '2px' }}>Execution Error</div>
+                <div style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '12px', wordBreak: 'break-word' }}>
+                  {errorMessage}
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '6px' }}>
+                  💡 Make sure your code is complete and self-contained (e.g. define and call the function with sample data).
+                </div>
+              </div>
+              <button
+                onClick={() => setErrorMessage(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px', flexShrink: 0, padding: '0 4px' }}
+              >×</button>
+            </div>
+          )}
 
           {/* Visualizer grows */}
           <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', margin: '8px 0' }}>
