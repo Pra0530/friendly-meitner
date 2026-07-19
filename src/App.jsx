@@ -9,7 +9,8 @@ import TerminalEmulator from './components/TerminalEmulator';
 import StatusBar from './components/StatusBar';
 import { generateExecutionTrace } from './services/aiService';
 import { pluginManager } from './services/pluginManager';
-import { Key, BookOpen } from 'lucide-react';
+import { Key, BookOpen, Cpu } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const getInitialKey = () => {
   try { return localStorage.getItem('codemaster_api_key') || ''; }
@@ -36,11 +37,7 @@ function App() {
   const [isSplitView, setIsSplitView] = useState(false);
   const [diagnostics, setDiagnostics] = useState([]);
 
-  const [aiData, setAiData] = useState({
-    layout_type: 'LINKED_LIST',
-    initial_data: [10, 20, 30, 40, 50],
-    trace: [{ line: 0, pointers: { slow: 0, fast: 0 }, variables: {} }]
-  });
+  const [aiData, setAiData] = useState(null);
 
   // Register sandboxed plugins (lazy — Worker only spawns if browser supports it)
   useEffect(() => {
@@ -91,7 +88,7 @@ function App() {
     setActiveQuestion(q);
     setStep(0);
     setIsPlaying(false);
-    setAiData({ layout_type: 'ARRAY', initial_data: [], trace: [] });
+    setAiData(null);
 
     if (q.code) {
       setEditorInitialCode(q.code);
@@ -211,53 +208,114 @@ function App() {
             </div>
           </div>
 
-          <InputEditor
-            onRun={(customInput) => handlePlay(editorCode, customInput)}
-            isAnalyzing={isAnalyzing}
-            initialData={aiData?.initial_data}
-          />
+          {aiData ? (
+            <>
+              <InputEditor
+                onRun={(customInput) => handlePlay(editorCode, customInput)}
+                isAnalyzing={isAnalyzing}
+                initialData={aiData?.initial_data}
+              />
 
-          {/* ── Execution Error Banner ── */}
-          {errorMessage && (
-            <div style={{
-              flexShrink: 0,
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
-              borderRadius: '8px',
-              padding: '10px 16px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '10px',
-              marginBottom: '8px'
-            }}>
-              <span style={{ color: '#ef4444', fontSize: '16px', flexShrink: 0 }}>✕</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ color: '#ef4444', fontWeight: '600', fontSize: '13px', marginBottom: '2px' }}>Execution Error</div>
-                <div style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '12px', wordBreak: 'break-word' }}>
-                  {errorMessage}
+              {/* ── Execution Error Banner ── */}
+              {errorMessage && (
+                <div style={{
+                  flexShrink: 0,
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: '8px',
+                  padding: '10px 16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  marginBottom: '8px'
+                }}>
+                  <span style={{ color: '#ef4444', fontSize: '16px', flexShrink: 0 }}>✕</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: '#ef4444', fontWeight: '600', fontSize: '13px', marginBottom: '2px' }}>Execution Error</div>
+                    <div style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '12px', wordBreak: 'break-word' }}>
+                      {errorMessage}
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '6px' }}>
+                      💡 Make sure your code is complete and self-contained (e.g. define and call the function with sample data).
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setErrorMessage(null)}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px', flexShrink: 0, padding: '0 4px' }}
+                  >×</button>
                 </div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '6px' }}>
-                  💡 Make sure your code is complete and self-contained (e.g. define and call the function with sample data).
+              )}
+
+              {/* Visualizer grows */}
+              <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', margin: '8px 0' }}>
+                <Visualizer
+                  step={step}
+                  setStep={setStep}
+                  isPlaying={isPlaying}
+                  setIsPlaying={setIsPlaying}
+                  aiData={aiData}
+                  insight={activeQuestion?.insight}
+                />
+              </div>
+            </>
+          ) : (
+            /* ── Onboarding Placeholder State ── */
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '32px 20px',
+              textAlign: 'center',
+              background: 'rgba(255, 255, 255, 0.01)',
+              border: '1px dashed rgba(255, 255, 255, 0.05)',
+              borderRadius: '12px',
+              margin: '8px 0',
+              color: 'var(--text-secondary)',
+              minHeight: 0,
+              overflowY: 'auto'
+            }}>
+              <motion.div
+                animate={{ scale: [1, 1.06, 1] }}
+                transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '50%',
+                  background: 'rgba(96, 165, 250, 0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '16px',
+                  border: '1px solid rgba(96, 165, 250, 0.25)',
+                  boxShadow: '0 0 16px rgba(96, 165, 250, 0.1)'
+                }}
+              >
+                <Cpu size={24} color="var(--accent-color)" />
+              </motion.div>
+              <h3 style={{ color: '#fff', fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
+                Ready to Visualize
+              </h3>
+              <p style={{ maxWidth: '320px', fontSize: '13px', lineHeight: '1.5', color: 'var(--text-muted)', marginBottom: '20px' }}>
+                Write or paste your algorithm on the left, then click the blue Play button (▶) to execute and see it animate step-by-step.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '280px', textAlign: 'left', fontSize: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                  <span style={{ color: 'var(--accent-color)', fontSize: '14px' }}>⚡</span>
+                  <span><strong>Variables:</strong> Trace locals, conditions & loops</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                  <span style={{ color: 'var(--accent-color)', fontSize: '14px' }}>📊</span>
+                  <span><strong>Arrays:</strong> Watch pointers & value swaps</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                  <span style={{ color: 'var(--accent-color)', fontSize: '14px' }}>🌳</span>
+                  <span><strong>Structures:</strong> Trees, Lists & Graphs</span>
                 </div>
               </div>
-              <button
-                onClick={() => setErrorMessage(null)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px', flexShrink: 0, padding: '0 4px' }}
-              >×</button>
             </div>
           )}
-
-          {/* Visualizer grows */}
-          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', margin: '8px 0' }}>
-            <Visualizer
-              step={step}
-              setStep={setStep}
-              isPlaying={isPlaying}
-              setIsPlaying={setIsPlaying}
-              aiData={aiData}
-              insight={activeQuestion?.insight}
-            />
-          </div>
 
           {/* Terminal at the bottom */}
           <div style={{ flexShrink: 0 }}>
