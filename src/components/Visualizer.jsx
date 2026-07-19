@@ -179,10 +179,10 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
           minHeight: '260px',
           overflow: 'auto',
           display: 'flex',
-          alignItems: layout_type === 'variables' ? 'flex-start' : 'center',
+          alignItems: (layout_type === 'variables' || layout_type === 'tree') ? 'flex-start' : 'center',
           justifyContent: layout_type === 'variables' ? 'flex-start' : 'center',
           width: '100%',
-          padding: layout_type === 'variables' ? '4px 0' : '0'
+          padding: (layout_type === 'variables' || layout_type === 'tree') ? '16px 0' : '0'
         }}
       >
         {layout_type === 'array' || layout_type === 'linked_list' ? (

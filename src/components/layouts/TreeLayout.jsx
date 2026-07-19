@@ -41,15 +41,15 @@ const TreeLayout = ({ initial_data, root_id, pointers, currentState }) => {
 
     const rootId = root_id || (initial_data.length > 0 ? initial_data[0].id : null);
     if (rootId) {
-      // Center the root at x = 300, y = 40 (inside 600px container)
-      layoutTree(rootId, 300, 40, 1);
+      // Center the root at x = 300, y = 60 (inside 600px container)
+      layoutTree(rootId, 300, 60, 1);
     }
 
     return { nodes: initial_data, edges: edgeList, positions: pos };
   }, [initial_data, root_id]);
 
   return (
-    <div style={{ position: 'relative', width: '600px', height: '360px', margin: '0 auto', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', width: '600px', height: '380px', margin: '0 auto', overflow: 'hidden' }}>
       
       {/* SVG for Edges */}
       <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
