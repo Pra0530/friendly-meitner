@@ -1,9 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Code2, Play, Loader2, AlertCircle } from 'lucide-react';
-import Editor from 'react-simple-code-editor';
-import Prism from 'prismjs';
-import { pluginManager } from '../services/pluginManager';
-import 'prismjs/themes/prism-twilight.css';
+
+const LINE_HEIGHT = 20; // px per line
 
 const CodeEditor = ({ 
   step, 
@@ -14,46 +12,82 @@ const CodeEditor = ({
   onCodeChange,
   onDiagnosticsChange 
 }) => {
-  const [code, setCode] = useState(
-    '// Hey AI, please trace this with a target value of 7\nfunction searchBST(root, target) {\n  let curr = root;\n  \n  while (curr !== null) {\n    if (curr.val === target) {\n      return curr;\n    }\n    \n    // If target is smaller, go left\n    if (target < curr.val) {\n      curr = curr.left;\n    } \n    // If target is larger, go right\n    else {\n      curr = curr.right;\n    }\n  }\n  \n  return null;\n}'
-  );
+  const DEFAULT_CODE = `// Hey AI, please trace this with a target value of 7
+function searchBST(root, target) {
+  let curr = root;
+  
+  while (curr !== null) {
+    if (curr.val === target) {
+      return curr;
+    }
+    
+    // If target is smaller, go left
+    if (target < curr.val) {
+      curr = curr.left;
+    } 
+    // If target is larger, go right
+    else {
+      curr = curr.right;
+    }
+  }
+  
+  return null;
+}`;
 
+  const [code, setCode] = useState(DEFAULT_CODE);
   const [diagnostics, setDiagnostics] = useState([]);
   const [scrollTop, setScrollTop] = useState(0);
-  const [clientHeight, setClientHeight] = useState(500);
+  const [containerHeight, setContainerHeight] = useState(500);
 
-  const bgRef = useRef(null);
   const containerRef = useRef(null);
+  const textareaRef = useRef(null);
+  const highlightRef = useRef(null);
   const lspWorkerRef = useRef(null);
-  const debounceTimeoutRef = useRef(null);
+  const debounceRef = useRef(null);
 
-  // Initialize Language Server Web Worker (LSP Decoupled Intelligence)
+  // ---------- LSP Worker (decoupled, non-blocking) ----------
   useEffect(() => {
     try {
-      lspWorkerRef.current = new Worker('/languageWorker.js');
-      lspWorkerRef.current.postMessage({ method: 'initialize' });
+      if (typeof Worker !== 'undefined') {
+        lspWorkerRef.current = new Worker('/languageWorker.js');
+        lspWorkerRef.current.postMessage({ method: 'initialize' });
 
-      lspWorkerRef.current.onmessage = (e) => {
-        const { method, params } = e.data;
-        if (method === 'textDocument/publishDiagnostics') {
-          const { diagnostics: newDiagnostics, symbols } = params;
-          setDiagnostics(newDiagnostics);
-          if (onDiagnosticsChange) {
-            onDiagnosticsChange(newDiagnostics, symbols);
+        lspWorkerRef.current.onmessage = (e) => {
+          const { method, params } = e.data;
+          if (method === 'textDocument/publishDiagnostics') {
+            const { diagnostics: diags, symbols } = params;
+            setDiagnostics(diags || []);
+            if (onDiagnosticsChange) onDiagnosticsChange(diags || [], symbols || []);
           }
-          // Notify plugins about compilation/AST event
-          pluginManager.triggerEvent('onDiagnostics', { diagnostics: newDiagnostics, symbols });
-        }
-      };
+        };
+
+        lspWorkerRef.current.onerror = (err) => {
+          console.warn('LSP Worker error (non-fatal):', err.message);
+        };
+      }
     } catch (err) {
-      console.error('Failed to spawn LSP Web Worker:', err);
+      console.warn('LSP Worker could not start (non-fatal):', err.message);
     }
 
     return () => {
       if (lspWorkerRef.current) {
-        lspWorkerRef.current.terminate();
+        try { lspWorkerRef.current.terminate(); } catch (e) {}
       }
     };
+  }, []);
+
+  // Debounced send to LSP Worker
+  const triggerDiagnostics = useCallback((text) => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      if (lspWorkerRef.current) {
+        const isPython = /\bdef\b|\bimport\b|\bprint\s*\(/.test(text);
+        lspWorkerRef.current.postMessage({
+          method: 'textDocument/didChange',
+          params: { text, language: isPython ? 'python' : 'javascript' }
+        });
+      }
+    }, 200);
   }, []);
 
   // Sync initial code override
@@ -65,320 +99,304 @@ const CodeEditor = ({
     }
   }, [initialCodeOverride]);
 
-  // Debounced Syntax Checking via LSP Worker
-  const triggerDiagnostics = (newCode) => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    debounceTimeoutRef.current = setTimeout(() => {
-      if (lspWorkerRef.current) {
-        const isPython = newCode.includes('def ') || newCode.includes('import ') || newCode.includes('print(');
-        lspWorkerRef.current.postMessage({
-          method: 'textDocument/didChange',
-          params: {
-            text: newCode,
-            language: isPython ? 'python' : 'javascript'
-          }
-        });
-      }
-    }, 150);
-  };
-
-  const handleScroll = (e) => {
-    setScrollTop(e.target.scrollTop);
-    setClientHeight(e.target.clientHeight);
-    if (bgRef.current) {
-      bgRef.current.scrollTop = e.target.scrollTop;
-      bgRef.current.scrollLeft = e.target.scrollLeft;
-    }
-  };
-
-  // Adjust height measurement on mount/resize
+  // Measure container
   useEffect(() => {
-    if (containerRef.current) {
-      setClientHeight(containerRef.current.clientHeight);
-    }
+    if (!containerRef.current) return;
+    setContainerHeight(containerRef.current.clientHeight);
+    const ro = new ResizeObserver(entries => {
+      setContainerHeight(entries[0]?.contentRect?.height || 500);
+    });
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
   }, []);
 
-  const safeTrace = trace || [];
-  const activeLine = (safeTrace && safeTrace[step]) ? safeTrace[step].line : -1;
+  // Sync scroll between textarea and highlight overlay
+  const handleScroll = (e) => {
+    const st = e.target.scrollTop;
+    const sl = e.target.scrollLeft;
+    setScrollTop(st);
+    if (highlightRef.current) {
+      highlightRef.current.scrollTop = st;
+      highlightRef.current.scrollLeft = sl;
+    }
+  };
+
+  const safeTrace = Array.isArray(trace) ? trace : [];
+  const activeLine = (safeTrace[step] ? safeTrace[step].line : -1); // 1-based
   const lines = code.split('\n');
 
-  useEffect(() => {
-    // Dynamically load Prism languages to avoid Vite production hoisting crashes
-    window.Prism = Prism;
-    import('prismjs/components/prism-javascript');
-    import('prismjs/components/prism-python');
-  }, []);
+  // Viewport virtualization: render only visible line numbers
+  const visibleStart = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - 5);
+  const visibleEnd = Math.min(lines.length, Math.ceil((scrollTop + containerHeight) / LINE_HEIGHT) + 5);
 
+  // ---------- Smart key handling ----------
   const handleKeyDown = (e) => {
-    const textarea = e.target;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const val = textarea.value;
+    const ta = e.target;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const val = ta.value;
 
-    // 1. Bracket & Quote Auto-closing
-    const pairs = {
-      '{': '}',
-      '[': ']',
-      '(': ')',
-      '"': '"',
-      "'": "'",
-      '`': '`'
-    };
+    const pairs = { '{': '}', '[': ']', '(': ')', '"': '"', "'": "'", '`': '`' };
+    const closingSet = new Set(['}', ']', ')', '"', "'", '`']);
 
+    // Auto-close brackets
     if (pairs[e.key] !== undefined) {
       e.preventDefault();
-      const closingChar = pairs[e.key];
-      const newCode = val.substring(0, start) + e.key + closingChar + val.substring(end);
-      setCode(newCode);
-      if (onCodeChange) onCodeChange(newCode);
-      triggerDiagnostics(newCode);
-      
-      // Reposition cursor inside brackets/quotes
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + 1;
-      }, 0);
+      const closing = pairs[e.key];
+      const newCode = val.slice(0, start) + e.key + closing + val.slice(end);
+      updateCode(newCode, ta, start + 1);
       return;
     }
 
-    // 2. Overwriting auto-closed brackets/quotes
-    const closingChars = new Set(['}', ']', ')', '"', "'", '`']);
-    if (closingChars.has(e.key) && val[start] === e.key) {
+    // Skip over auto-closed character
+    if (closingSet.has(e.key) && val[start] === e.key && start === end) {
       e.preventDefault();
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + 1;
-      }, 0);
+      ta.selectionStart = ta.selectionEnd = start + 1;
       return;
     }
 
-    // 3. Backspacing an auto-closed bracket pair
-    if (e.key === 'Backspace' && start === end) {
-      const charBefore = val[start - 1];
-      const charAfter = val[start];
-      if (pairs[charBefore] === charAfter) {
+    // Delete bracket pair
+    if (e.key === 'Backspace' && start === end && start > 0) {
+      const before = val[start - 1];
+      const after = val[start];
+      if (pairs[before] === after) {
         e.preventDefault();
-        const newCode = val.substring(0, start - 1) + val.substring(start + 1);
-        setCode(newCode);
-        if (onCodeChange) onCodeChange(newCode);
-        triggerDiagnostics(newCode);
-        setTimeout(() => {
-          textarea.selectionStart = textarea.selectionEnd = start - 1;
-        }, 0);
+        const newCode = val.slice(0, start - 1) + val.slice(start + 1);
+        updateCode(newCode, ta, start - 1);
         return;
       }
     }
 
-    // 4. Auto-indentation on Enter
+    // Smart Enter indent
     if (e.key === 'Enter' && start === end) {
-      const linesBefore = val.substring(0, start).split('\n');
+      const linesBefore = val.slice(0, start).split('\n');
       const currentLine = linesBefore[linesBefore.length - 1];
-      const indentMatch = currentLine.match(/^(\s*)/);
-      const indent = indentMatch ? indentMatch[1] : '';
-
-      const trimmedLine = currentLine.trim();
-      const extraIndent = (trimmedLine.endsWith('{') || trimmedLine.endsWith(':') || trimmedLine.endsWith('[')) ? '  ' : '';
-
+      const baseIndent = currentLine.match(/^(\s*)/)[1];
+      const trimmed = currentLine.trimEnd();
+      const extraIndent = (trimmed.endsWith('{') || trimmed.endsWith(':') || trimmed.endsWith('[')) ? '  ' : '';
       e.preventDefault();
-      const newCode = val.substring(0, start) + '\n' + indent + extraIndent + val.substring(start);
-      setCode(newCode);
-      if (onCodeChange) onCodeChange(newCode);
-      triggerDiagnostics(newCode);
-
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + 1 + indent.length + extraIndent.length;
-      }, 0);
+      const insertion = '\n' + baseIndent + extraIndent;
+      const newCode = val.slice(0, start) + insertion + val.slice(end);
+      updateCode(newCode, ta, start + insertion.length);
       return;
     }
   };
 
-  const EditorComponent = Editor.default || Editor;
+  const updateCode = (newCode, ta, cursorPos) => {
+    setCode(newCode);
+    if (onCodeChange) onCodeChange(newCode);
+    triggerDiagnostics(newCode);
+    // Restore cursor after React re-render
+    requestAnimationFrame(() => {
+      if (ta) {
+        ta.selectionStart = cursorPos;
+        ta.selectionEnd = cursorPos;
+      }
+    });
+  };
 
-  // Viewport Virtualization Calculations
-  const startIdx = Math.max(0, Math.floor(scrollTop / 21) - 10);
-  const endIdx = Math.min(lines.length, Math.ceil((scrollTop + clientHeight) / 21) + 10);
+  // Syntax colorise (CSS-only approach via keyword spans)
+  const colorise = (rawCode) => {
+    const escaped = rawCode
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    return escaped
+      // Strings
+      .replace(/(["'`])((?:\\.|(?!\1)[^\\])*)\1/g, '<span style="color:#a3e635">$1$2$1</span>')
+      // Single-line comments
+      .replace(/(\/\/[^\n]*)/g, '<span style="color:#64748b;font-style:italic">$1</span>')
+      // Multi-line comments
+      .replace(/(\/\*[\s\S]*?\*\/)/g, '<span style="color:#64748b;font-style:italic">$1</span>')
+      // Keywords
+      .replace(/\b(function|return|const|let|var|if|else|while|for|of|in|class|new|this|typeof|null|undefined|true|false|import|export|default|async|await|break|continue|switch|case|try|catch|throw|def|pass|print|not|and|or|elif|yield)\b/g, '<span style="color:#818cf8">$1</span>')
+      // Numbers
+      .replace(/\b(\d+\.?\d*)\b/g, '<span style="color:#fb923c">$1</span>');
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '20px' }}>
+      {/* Header */}
       <div className="controls-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Code2 size={20} color="var(--accent-color)" />
           <h2 style={{ fontSize: '18px', fontWeight: '600' }}>Source Code</h2>
         </div>
         <button 
-          className="icon-button primary" 
-          title="Analyze & Play" 
+          className="icon-button primary"
           onClick={() => onPlay(code)}
           disabled={isAnalyzing}
           style={{ opacity: isAnalyzing ? 0.7 : 1 }}
         >
-          {isAnalyzing ? <Loader2 size={18} className="spin" /> : <Play size={18} />}
+          {isAnalyzing ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={18} />}
         </button>
       </div>
-      
-      <div 
+
+      {/* Editor Body */}
+      <div
         ref={containerRef}
-        style={{ flex: 1, position: 'relative', overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--border-glass)', background: '#141414' }}
+        style={{
+          flex: 1,
+          position: 'relative',
+          overflow: 'hidden',
+          borderRadius: '8px',
+          border: '1px solid var(--border-glass)',
+          background: '#0d0d0f',
+          display: 'flex'
+        }}
       >
-        {/* Background Highlight Layer (Virtualized) */}
-        <div 
-          ref={bgRef}
-          style={{ 
-            position: 'absolute', 
-            top: 0,
-            bottom: 0,
-            left: '36px',
-            right: 0,
-            paddingTop: '16px', 
-            paddingBottom: '16px', 
-            paddingLeft: '12px',
-            overflow: 'hidden', 
-            pointerEvents: 'none', 
-            zIndex: 1 
-          }}
-        >
-          <div style={{ position: 'relative', height: `${lines.length * 21}px`, width: '100%' }}>
-            {lines.slice(startIdx, endIdx).map((_, i) => {
-              const idx = startIdx + i;
-              if ((activeLine - 1) !== idx) return null;
+        {/* Line Number Gutter — Virtualized */}
+        <div style={{
+          width: '44px',
+          flexShrink: 0,
+          background: '#0d0d0f',
+          borderRight: '1px solid rgba(255,255,255,0.05)',
+          overflow: 'hidden',
+          position: 'relative',
+          userSelect: 'none'
+        }}>
+          {/* Spacer so gutter scrolls with textarea */}
+          <div style={{ height: `${lines.length * LINE_HEIGHT + 32}px`, position: 'relative' }}>
+            {lines.slice(visibleStart, visibleEnd).map((_, i) => {
+              const lineIdx = visibleStart + i;
+              const isActive = lineIdx === activeLine - 1;
               return (
-                <div 
-                  key={idx}
-                  style={{ 
+                <div
+                  key={lineIdx}
+                  style={{
                     position: 'absolute',
-                    top: `${idx * 21}px`,
+                    top: `${lineIdx * LINE_HEIGHT + 16}px`,
                     left: 0,
-                    height: '21px',
-                    width: '1000%',
-                    marginLeft: '-12px',
-                    paddingLeft: '12px',
-                    background: 'rgba(56, 189, 248, 0.15)',
-                    borderLeft: '3px solid var(--accent-color)',
-                    transition: 'all 0.2s ease'
+                    right: 0,
+                    height: `${LINE_HEIGHT}px`,
+                    lineHeight: `${LINE_HEIGHT}px`,
+                    textAlign: 'right',
+                    paddingRight: '8px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '12px',
+                    color: isActive ? 'var(--accent-color)' : '#3f3f52',
+                    fontWeight: isActive ? 'bold' : 'normal',
+                    transition: 'color 0.15s ease'
                   }}
-                />
+                >
+                  {lineIdx + 1}
+                </div>
               );
             })}
           </div>
         </div>
 
-        {/* Real Syntax Highlighted Editor */}
-        <div 
-          style={{ position: 'absolute', inset: 0, zIndex: 2, overflow: 'auto', display: 'flex' }} 
-          onScroll={handleScroll}
-        >
-          {/* Gutter / Line Numbers (Virtualized) */}
-          <div style={{
-            position: 'sticky',
-            left: 0,
-            width: '36px',
-            background: '#141414',
-            borderRight: '1px solid var(--border-glass)',
-            paddingTop: '16px',
-            paddingBottom: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-end',
-            paddingRight: '8px',
-            userSelect: 'none',
-            fontFamily: 'var(--font-mono)',
-            fontSize: '12px',
-            lineHeight: '21px',
-            zIndex: 4,
-            height: `${lines.length * 21 + 32}px`,
-            color: '#4a5568'
-          }}>
-            <div style={{ position: 'relative', height: `${lines.length * 21}px`, width: '100%' }}>
-              {lines.slice(startIdx, endIdx).map((_, i) => {
-                const idx = startIdx + i;
-                return (
-                  <div 
-                    key={idx} 
-                    style={{ 
-                      position: 'absolute',
-                      top: `${idx * 21}px`,
-                      right: 0,
-                      left: 0,
-                      height: '21px',
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      color: (activeLine - 1) === idx ? 'var(--accent-color)' : '#4a5568',
-                      fontWeight: (activeLine - 1) === idx ? 'bold' : 'normal'
-                    }}
-                  >
-                    {idx + 1}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+        {/* Code Area */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
 
-          <div style={{ flex: 1, position: 'relative' }}>
-            <EditorComponent
-              value={code}
-              onValueChange={newCode => {
-                setCode(newCode);
-                if (onCodeChange) onCodeChange(newCode);
-                triggerDiagnostics(newCode);
-              }}
-              highlight={code => {
-                const grammar = Prism.languages.javascript || Prism.languages.js;
-                if (grammar) {
-                  try {
-                    return Prism.highlight(code, grammar, 'javascript');
-                  } catch (e) {
-                    return code;
-                  }
-                }
-                return code;
-              }}
-              onKeyDown={handleKeyDown}
-              padding={0}
+          {/* Syntax Highlight Overlay (read-only, non-interactive) */}
+          <div
+            ref={highlightRef}
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              padding: '16px 16px 16px 12px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '14px',
+              lineHeight: `${LINE_HEIGHT}px`,
+              whiteSpace: 'pre',
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              pointerEvents: 'none',
+              zIndex: 1,
+              color: '#e2e8f0',
+              wordBreak: 'keep-all'
+            }}
+            dangerouslySetInnerHTML={{ __html: colorise(code) }}
+          />
+
+          {/* Active Line Highlight */}
+          {activeLine > 0 && (
+            <div
+              aria-hidden="true"
               style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 14,
-                lineHeight: '21px',
-                minHeight: '100%',
-                outline: 'none',
-                paddingTop: '16px',
-                paddingBottom: '16px',
-                paddingLeft: '12px',
-                paddingRight: '16px'
+                position: 'absolute',
+                top: `${(activeLine - 1) * LINE_HEIGHT + 16}px`,
+                left: 0,
+                right: 0,
+                height: `${LINE_HEIGHT}px`,
+                background: 'rgba(56, 189, 248, 0.12)',
+                borderLeft: '3px solid var(--accent-color)',
+                pointerEvents: 'none',
+                zIndex: 2,
+                transition: 'top 0.15s ease'
               }}
             />
-          </div>
+          )}
+
+          {/* The actual textarea (transparent text, on top of highlight) */}
+          <textarea
+            ref={textareaRef}
+            value={code}
+            onChange={(e) => {
+              const newCode = e.target.value;
+              setCode(newCode);
+              if (onCodeChange) onCodeChange(newCode);
+              triggerDiagnostics(newCode);
+            }}
+            onKeyDown={handleKeyDown}
+            onScroll={handleScroll}
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              padding: '16px 16px 16px 12px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '14px',
+              lineHeight: `${LINE_HEIGHT}px`,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              resize: 'none',
+              color: 'transparent',
+              caretColor: '#60a5fa',
+              zIndex: 3,
+              width: '100%',
+              height: '100%',
+              overflowX: 'auto',
+              overflowY: 'auto',
+              whiteSpace: 'pre',
+              wordBreak: 'keep-all',
+              tabSize: 2
+            }}
+          />
         </div>
       </div>
 
-      {/* LSP Inline Diagnostics Panel */}
+      {/* Diagnostics Panel (LSP errors) */}
       {diagnostics.length > 0 && (
         <div style={{
-          marginTop: '12px',
-          background: 'rgba(239, 68, 68, 0.08)',
-          border: '1px solid rgba(239, 68, 68, 0.2)',
+          marginTop: '10px',
+          background: 'rgba(239, 68, 68, 0.06)',
+          border: '1px solid rgba(239, 68, 68, 0.18)',
           borderRadius: '8px',
-          padding: '10px 14px',
+          padding: '8px 12px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '6px',
-          maxHeight: '100px',
+          gap: '4px',
+          maxHeight: '80px',
           overflowY: 'auto'
         }}>
-          {diagnostics.map((diag, idx) => (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger-color)', fontSize: '13px' }}>
-              <AlertCircle size={14} />
+          {diagnostics.slice(0, 5).map((diag, idx) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger-color)', fontSize: '12px' }}>
+              <AlertCircle size={12} />
               <span><strong>Line {diag.line}:</strong> {diag.message}</span>
             </div>
           ))}
         </div>
       )}
-      
+
       <style>{`
-        .spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
-        /* Override prism JS default backgrounds */
-        pre[class*="language-"] { background: transparent !important; margin: 0 !important; padding: 0 !important; }
-        code[class*="language-"], pre[class*="language-"] { text-shadow: none !important; color: #e2e8f0 !important; }
       `}</style>
     </div>
   );

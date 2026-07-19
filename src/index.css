@@ -77,8 +77,8 @@ body {
   display: grid;
   grid-template-columns: 400px 1fr;
   gap: 24px;
-  height: 100vh;
-  padding: 24px;
+  height: calc(100vh - 24px);
+  padding: 24px 24px 0 24px;
   max-width: 1920px;
   margin: 0 auto;
 }

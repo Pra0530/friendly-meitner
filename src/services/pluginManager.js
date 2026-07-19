@@ -1,66 +1,65 @@
-// pluginManager.js - Client side extension orchestra
+// pluginManager.js - Client side extension orchestra (lazy-initialised)
 class PluginManager {
   constructor() {
     this.plugins = [];
     this.worker = null;
     this.listeners = new Set();
+    this._initialized = false;
   }
 
   initialize() {
-    if (this.worker) return;
+    if (this._initialized) return;
+    this._initialized = true;
 
     try {
-      this.worker = new Worker("/extensionWorker.js");
+      // Only spawn Worker in browser context
+      if (typeof window === 'undefined' || typeof Worker === 'undefined') return;
+      this.worker = new Worker('/extensionWorker.js');
       this.worker.onmessage = (e) => {
         const { action, pluginId, level, message, data } = e.data;
 
-        if (action === "log") {
+        if (action === 'log') {
           console.log(`[Plugin: ${pluginId}] [${level.toUpperCase()}]`, message);
-          this.notifyListeners("log", { pluginId, level, message });
+          this.notifyListeners('log', { pluginId, level, message });
         }
-
-        if (action === "pluginMessage") {
-          this.notifyListeners("message", { pluginId, data });
+        if (action === 'pluginMessage') {
+          this.notifyListeners('message', { pluginId, data });
         }
-
-        if (action === "loaded") {
-          console.log(`Plugin loaded and sandboxed successfully: ${pluginId}`);
-          this.notifyListeners("status", { pluginId, status: "active" });
+        if (action === 'loaded') {
+          this.notifyListeners('status', { pluginId, status: 'active' });
         }
-
-        if (action === "error") {
-          console.error(`Plugin sandbox crash: ${pluginId}`, message);
-          this.notifyListeners("status", { pluginId, status: "crashed", error: message });
+        if (action === 'error') {
+          console.warn(`Plugin sandbox error (${pluginId}):`, message);
+          this.notifyListeners('status', { pluginId, status: 'crashed', error: message });
         }
       };
+      this.worker.onerror = (err) => {
+        // Non-critical — main thread continues unaffected
+        console.warn('Extension worker error (non-fatal):', err.message);
+      };
     } catch (err) {
-      console.error("Failed to spawn Plugin Sandbox Worker:", err);
+      // Worker unsupported or blocked — main thread continues unaffected
+      console.warn('Plugin sandbox unavailable (non-fatal):', err.message);
     }
   }
 
   registerPlugin(id, code) {
+    // Defer initialization to ensure we're in a browser context
     this.initialize();
-    
-    const existing = this.plugins.find(p => p.id === id);
-    if (existing) return;
 
-    this.plugins.push({ id, code, status: "loading" });
-    
+    if (this.plugins.find(p => p.id === id)) return;
+    this.plugins.push({ id, code, status: 'loading' });
+
     if (this.worker) {
-      this.worker.postMessage({
-        action: "load",
-        pluginId: id,
-        code: code
-      });
+      this.worker.postMessage({ action: 'load', pluginId: id, code });
     }
   }
 
   triggerEvent(eventName, eventData) {
     if (!this.worker) return;
-
     this.plugins.forEach(plugin => {
       this.worker.postMessage({
-        action: "triggerEvent",
+        action: 'triggerEvent',
         pluginId: plugin.id,
         eventName,
         eventData
@@ -74,7 +73,9 @@ class PluginManager {
   }
 
   notifyListeners(type, event) {
-    this.listeners.forEach(cb => cb(type, event));
+    this.listeners.forEach(cb => {
+      try { cb(type, event); } catch (e) {}
+    });
   }
 }
 

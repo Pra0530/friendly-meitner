@@ -9,11 +9,11 @@ const CommandPalette = ({ isOpen, onClose, onSelectQuestion }) => {
   const inputRef = useRef(null);
   const listRef = useRef(null);
 
-  // Flatten categories into an array of questions
-  const allQuestions = Object.entries(dsaQuestions).flatMap(([category, list]) => 
-    list.map(q => ({
+  // dsaQuestions is an array of { category, questions[] }
+  const allQuestions = dsaQuestions.flatMap(section =>
+    (section.questions || []).map(q => ({
       ...q,
-      category
+      category: section.category || 'General'
     }))
   );
 
