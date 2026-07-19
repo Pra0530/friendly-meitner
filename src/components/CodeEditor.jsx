@@ -1,29 +1,104 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Code2, Play, Loader2 } from 'lucide-react';
+import { Code2, Play, Loader2, AlertCircle } from 'lucide-react';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
+import { pluginManager } from '../services/pluginManager';
 import 'prismjs/themes/prism-twilight.css';
 
-const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride, onCodeChange }) => {
+const CodeEditor = ({ 
+  step, 
+  onPlay, 
+  isAnalyzing, 
+  trace = [], 
+  initialCodeOverride, 
+  onCodeChange,
+  onDiagnosticsChange 
+}) => {
   const [code, setCode] = useState(
     '// Hey AI, please trace this with a target value of 7\nfunction searchBST(root, target) {\n  let curr = root;\n  \n  while (curr !== null) {\n    if (curr.val === target) {\n      return curr;\n    }\n    \n    // If target is smaller, go left\n    if (target < curr.val) {\n      curr = curr.left;\n    } \n    // If target is larger, go right\n    else {\n      curr = curr.right;\n    }\n  }\n  \n  return null;\n}'
   );
-  
+
+  const [diagnostics, setDiagnostics] = useState([]);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [clientHeight, setClientHeight] = useState(500);
+
+  const bgRef = useRef(null);
+  const containerRef = useRef(null);
+  const lspWorkerRef = useRef(null);
+  const debounceTimeoutRef = useRef(null);
+
+  // Initialize Language Server Web Worker (LSP Decoupled Intelligence)
+  useEffect(() => {
+    try {
+      lspWorkerRef.current = new Worker('/languageWorker.js');
+      lspWorkerRef.current.postMessage({ method: 'initialize' });
+
+      lspWorkerRef.current.onmessage = (e) => {
+        const { method, params } = e.data;
+        if (method === 'textDocument/publishDiagnostics') {
+          const { diagnostics: newDiagnostics, symbols } = params;
+          setDiagnostics(newDiagnostics);
+          if (onDiagnosticsChange) {
+            onDiagnosticsChange(newDiagnostics, symbols);
+          }
+          // Notify plugins about compilation/AST event
+          pluginManager.triggerEvent('onDiagnostics', { diagnostics: newDiagnostics, symbols });
+        }
+      };
+    } catch (err) {
+      console.error('Failed to spawn LSP Web Worker:', err);
+    }
+
+    return () => {
+      if (lspWorkerRef.current) {
+        lspWorkerRef.current.terminate();
+      }
+    };
+  }, []);
+
+  // Sync initial code override
   useEffect(() => {
     if (initialCodeOverride) {
       setCode(initialCodeOverride);
       if (onCodeChange) onCodeChange(initialCodeOverride);
+      triggerDiagnostics(initialCodeOverride);
     }
   }, [initialCodeOverride]);
-  
-  const bgRef = useRef(null);
+
+  // Debounced Syntax Checking via LSP Worker
+  const triggerDiagnostics = (newCode) => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      if (lspWorkerRef.current) {
+        const isPython = newCode.includes('def ') || newCode.includes('import ') || newCode.includes('print(');
+        lspWorkerRef.current.postMessage({
+          method: 'textDocument/didChange',
+          params: {
+            text: newCode,
+            language: isPython ? 'python' : 'javascript'
+          }
+        });
+      }
+    }, 150);
+  };
 
   const handleScroll = (e) => {
+    setScrollTop(e.target.scrollTop);
+    setClientHeight(e.target.clientHeight);
     if (bgRef.current) {
       bgRef.current.scrollTop = e.target.scrollTop;
       bgRef.current.scrollLeft = e.target.scrollLeft;
     }
   };
+
+  // Adjust height measurement on mount/resize
+  useEffect(() => {
+    if (containerRef.current) {
+      setClientHeight(containerRef.current.clientHeight);
+    }
+  }, []);
 
   const safeTrace = trace || [];
   const activeLine = (safeTrace && safeTrace[step]) ? safeTrace[step].line : -1;
@@ -58,6 +133,7 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
       const newCode = val.substring(0, start) + e.key + closingChar + val.substring(end);
       setCode(newCode);
       if (onCodeChange) onCodeChange(newCode);
+      triggerDiagnostics(newCode);
       
       // Reposition cursor inside brackets/quotes
       setTimeout(() => {
@@ -85,6 +161,7 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
         const newCode = val.substring(0, start - 1) + val.substring(start + 1);
         setCode(newCode);
         if (onCodeChange) onCodeChange(newCode);
+        triggerDiagnostics(newCode);
         setTimeout(() => {
           textarea.selectionStart = textarea.selectionEnd = start - 1;
         }, 0);
@@ -106,6 +183,7 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
       const newCode = val.substring(0, start) + '\n' + indent + extraIndent + val.substring(start);
       setCode(newCode);
       if (onCodeChange) onCodeChange(newCode);
+      triggerDiagnostics(newCode);
 
       setTimeout(() => {
         textarea.selectionStart = textarea.selectionEnd = start + 1 + indent.length + extraIndent.length;
@@ -115,6 +193,10 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
   };
 
   const EditorComponent = Editor.default || Editor;
+
+  // Viewport Virtualization Calculations
+  const startIdx = Math.max(0, Math.floor(scrollTop / 21) - 10);
+  const endIdx = Math.min(lines.length, Math.ceil((scrollTop + clientHeight) / 21) + 10);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '20px' }}>
@@ -134,9 +216,11 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
         </button>
       </div>
       
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--border-glass)', background: '#141414' }}>
-        
-        {/* Background Highlight Layer */}
+      <div 
+        ref={containerRef}
+        style={{ flex: 1, position: 'relative', overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--border-glass)', background: '#141414' }}
+      >
+        {/* Background Highlight Layer (Virtualized) */}
         <div 
           ref={bgRef}
           style={{ 
@@ -153,20 +237,29 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
             zIndex: 1 
           }}
         >
-          {lines.map((_, index) => (
-            <div 
-              key={index}
-              style={{ 
-                height: '21px', // Enforced line height
-                width: '1000%',
-                marginLeft: '-12px',
-                paddingLeft: '12px',
-                background: (activeLine - 1) === index ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-                borderLeft: (activeLine - 1) === index ? '3px solid var(--accent-color)' : '3px solid transparent',
-                transition: 'all 0.2s ease'
-              }}
-            />
-          ))}
+          <div style={{ position: 'relative', height: `${lines.length * 21}px`, width: '100%' }}>
+            {lines.slice(startIdx, endIdx).map((_, i) => {
+              const idx = startIdx + i;
+              if ((activeLine - 1) !== idx) return null;
+              return (
+                <div 
+                  key={idx}
+                  style={{ 
+                    position: 'absolute',
+                    top: `${idx * 21}px`,
+                    left: 0,
+                    height: '21px',
+                    width: '1000%',
+                    marginLeft: '-12px',
+                    paddingLeft: '12px',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    borderLeft: '3px solid var(--accent-color)',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+              );
+            })}
+          </div>
         </div>
 
         {/* Real Syntax Highlighted Editor */}
@@ -174,7 +267,7 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
           style={{ position: 'absolute', inset: 0, zIndex: 2, overflow: 'auto', display: 'flex' }} 
           onScroll={handleScroll}
         >
-          {/* Gutter / Line Numbers */}
+          {/* Gutter / Line Numbers (Virtualized) */}
           <div style={{
             position: 'sticky',
             left: 0,
@@ -192,17 +285,32 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
             fontSize: '12px',
             lineHeight: '21px',
             zIndex: 4,
-            height: 'fit-content',
+            height: `${lines.length * 21 + 32}px`,
             color: '#4a5568'
           }}>
-            {Array.from({ length: lines.length }).map((_, idx) => (
-              <div key={idx} style={{ 
-                color: (activeLine - 1) === idx ? 'var(--accent-color)' : '#4a5568',
-                fontWeight: (activeLine - 1) === idx ? 'bold' : 'normal'
-              }}>
-                {idx + 1}
-              </div>
-            ))}
+            <div style={{ position: 'relative', height: `${lines.length * 21}px`, width: '100%' }}>
+              {lines.slice(startIdx, endIdx).map((_, i) => {
+                const idx = startIdx + i;
+                return (
+                  <div 
+                    key={idx} 
+                    style={{ 
+                      position: 'absolute',
+                      top: `${idx * 21}px`,
+                      right: 0,
+                      left: 0,
+                      height: '21px',
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      color: (activeLine - 1) === idx ? 'var(--accent-color)' : '#4a5568',
+                      fontWeight: (activeLine - 1) === idx ? 'bold' : 'normal'
+                    }}
+                  >
+                    {idx + 1}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div style={{ flex: 1, position: 'relative' }}>
@@ -211,6 +319,7 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
               onValueChange={newCode => {
                 setCode(newCode);
                 if (onCodeChange) onCodeChange(newCode);
+                triggerDiagnostics(newCode);
               }}
               highlight={code => {
                 const grammar = Prism.languages.javascript || Prism.languages.js;
@@ -240,6 +349,29 @@ const CodeEditor = ({ step, onPlay, isAnalyzing, trace = [], initialCodeOverride
           </div>
         </div>
       </div>
+
+      {/* LSP Inline Diagnostics Panel */}
+      {diagnostics.length > 0 && (
+        <div style={{
+          marginTop: '12px',
+          background: 'rgba(239, 68, 68, 0.08)',
+          border: '1px solid rgba(239, 68, 68, 0.2)',
+          borderRadius: '8px',
+          padding: '10px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          maxHeight: '100px',
+          overflowY: 'auto'
+        }}>
+          {diagnostics.map((diag, idx) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger-color)', fontSize: '13px' }}>
+              <AlertCircle size={14} />
+              <span><strong>Line {diag.line}:</strong> {diag.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
       
       <style>{`
         .spin { animation: spin 1s linear infinite; }
