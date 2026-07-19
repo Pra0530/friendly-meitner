@@ -77,15 +77,16 @@ function findElement(arr, target) {
   // Running standard JS code execution via simple eval (simulating sandbox inside Node)
   // Let's implement a mockup execution in Node environment
   const trace = [];
-  const __trace = (line, vars) => {
+  const __trace = (line, action, vars) => {
     trace.push({
       step: trace.length,
       line,
+      action,
       variables: vars
     });
   };
-  const __trace_cond = (line, cond, vars) => {
-    __trace(line, vars);
+  const __trace_cond = (line, action, cond, vars) => {
+    __trace(line, action, vars);
     return cond;
   };
 
@@ -101,8 +102,9 @@ function findElement(arr, target) {
   
   // Verify pointer variables mapped
   const finalStep = result.trace[result.trace.length - 1];
-  assert.ok('mid' in finalStep.pointers, "pointer 'mid' should be detected");
-  assert.strictEqual(finalStep.pointers.mid, 3, "pointer 'mid' should point to index 3 (value 7)");
+  const midPointer = finalStep.pointers.find(p => p.name === 'mid');
+  assert.ok(midPointer, "pointer 'mid' should be detected");
+  assert.strictEqual(midPointer.target, "3", "pointer 'mid' should point to index 3 (value 7)");
 
   console.log("✅ ARRAY layout test passed!");
 }
@@ -128,9 +130,11 @@ async function testTreePipeline() {
   assert.strictEqual(result.initial_data.length, 3, "initial_data tree nodes count should be 3");
   
   const step2 = result.trace[1];
-  assert.strictEqual(step2.pointers.curr, "node_2", "pointer 'curr' should point to node_2");
-  assert.deepStrictEqual(step2.visited_nodes, ["node_1", "node_2"], "visited_nodes should track node_1 and node_2");
-  assert.deepStrictEqual(step2.visited_edges, [["node_1", "node_2"]], "visited_edges should track transitions from node_1 to node_2");
+  const currPointer = step2.pointers.find(p => p.name === 'curr');
+  assert.ok(currPointer, "pointer 'curr' should be detected");
+  assert.strictEqual(currPointer.target, "node_2", "pointer 'curr' should point to node_2");
+  assert.deepStrictEqual(step2.visited.nodes, ["node_1", "node_2"], "visited.nodes should track node_1 and node_2");
+  assert.deepStrictEqual(step2.visited.edges, ["node_1-node_2"], "visited.edges should track transitions from node_1 to node_2");
 
   console.log("✅ TREE layout test passed!");
 }

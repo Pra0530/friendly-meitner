@@ -8,7 +8,10 @@ const StackLayout = ({ initial_data, pointers, traceHistory = [] }) => {
   
   let maxVisitedIdx = -1;
   traceHistory.forEach(t => {
-    const activeP = t.pointers ? Object.values(t.pointers).find(v => v !== null && v !== -1) : null;
+    const pList = Array.isArray(t.pointers)
+      ? t.pointers.map(p => parseInt(p.target, 10))
+      : Object.values(t.pointers || {}).map(v => parseInt(v, 10));
+    const activeP = pList.find(v => !isNaN(v) && v !== -1);
     if (activeP !== undefined && activeP !== null) {
       maxVisitedIdx = Math.max(maxVisitedIdx, activeP);
     }
@@ -27,7 +30,9 @@ const StackLayout = ({ initial_data, pointers, traceHistory = [] }) => {
       padding: '24px 0'
     }}>
       {initial_data.map((val, idx) => {
-        const activePointers = Object.entries(pointers).filter(([_, pIdx]) => pIdx === idx);
+        const activePointers = Array.isArray(pointers)
+          ? pointers.filter(p => parseInt(p.target, 10) === idx).map(p => [p.name, parseInt(p.target, 10)])
+          : Object.entries(pointers).filter(([_, pIdx]) => pIdx === idx);
         
         let nodeStyle = {
           minWidth: '80px',

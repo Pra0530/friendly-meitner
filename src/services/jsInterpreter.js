@@ -17,7 +17,7 @@ const loadBabelScript = () => {
 };
 
 /**
- * Instruments JS code to inject __trace calls that log line numbers, action type, and current scope variables.
+ * Instruments JS code to inject __trace calls that log line numbers and current scope variables.
  * @param {string} code - The raw JavaScript code.
  * @param {string} customInput - Optional custom input string to execute.
  * @returns {Promise<string>} - The instrumented code.
@@ -326,7 +326,6 @@ export const runJSSandbox = (instrumentedCode) => {
           };
 
           try {
-            // Block all network and dynamic code execution capabilities
             const fetch = undefined;
             const XMLHttpRequest = undefined;
             const WebSocket = undefined;

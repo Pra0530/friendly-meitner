@@ -10,7 +10,10 @@ const ArrayLayout = ({ initial_data, pointers, layout_type, traceHistory = [] })
   let maxVisitedIdx = -1;
 
   traceHistory.forEach(t => {
-    const activeP = t.pointers ? Object.values(t.pointers).find(v => v !== null && v !== -1) : null;
+    const pList = Array.isArray(t.pointers)
+      ? t.pointers.map(p => parseInt(p.target, 10))
+      : Object.values(t.pointers || {}).map(v => parseInt(v, 10));
+    const activeP = pList.find(v => !isNaN(v) && v !== -1);
     if (activeP !== undefined && activeP !== null) {
       maxVisitedIdx = Math.max(maxVisitedIdx, activeP);
     }
@@ -34,7 +37,9 @@ const ArrayLayout = ({ initial_data, pointers, layout_type, traceHistory = [] })
       height: '100%'
     }}>
       {initial_data.map((val, idx) => {
-        const activePointers = Object.entries(pointers).filter(([_, pIdx]) => pIdx === idx);
+        const activePointers = Array.isArray(pointers)
+          ? pointers.filter(p => parseInt(p.target, 10) === idx).map(p => [p.name, parseInt(p.target, 10)])
+          : Object.entries(pointers).filter(([_, pIdx]) => pIdx === idx);
         
         let nodeStyle = {
           borderRadius: layout_type === 'ARRAY' ? '0px' : '12px',

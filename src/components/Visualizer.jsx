@@ -21,16 +21,24 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
   const MAX_STEP = Math.max(0, trace.length - 1);
 
   const currentState = trace[step] || trace[0] || {};
-  const pointers = currentState?.pointers || {};
+  const pointers = currentState?.pointers || [];
   const variables = { ...currentState?.variables };
   
   // If a pointer doesn't exist in the data (like when it becomes null or -1)
   // we should display it in the variables section so the user knows it's null
-  Object.entries(pointers).forEach(([pName, pVal]) => {
-    if (pVal === -1 || pVal === null || pVal === "null") {
-      variables[pName] = "null";
-    }
-  });
+  if (Array.isArray(pointers)) {
+    pointers.forEach(({ name, target }) => {
+      if (target === "-1" || target === "null" || target === null || target === undefined) {
+        variables[name] = "null";
+      }
+    });
+  } else {
+    Object.entries(pointers).forEach(([pName, pVal]) => {
+      if (pVal === -1 || pVal === null || pVal === "null") {
+        variables[pName] = "null";
+      }
+    });
+  }
 
   const explanation = currentState?.explanation || "";
 

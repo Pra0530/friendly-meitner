@@ -86,7 +86,7 @@ export const mapStructure = (layoutType, trace, rawInitialData = []) => {
 
   // 3. Map pointers and visited states step-by-step
   trace.forEach((step, idx) => {
-    const pointers = {};
+    const pointers = [];
     const vars = step.variables || {};
 
     if (layoutType === 'ARRAY' || layoutType === 'STACK') {
@@ -102,7 +102,7 @@ export const mapStructure = (layoutType, trace, rawInitialData = []) => {
       for (const [k, v] of Object.entries(vars)) {
         if (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < arrLen) {
           if (POINTER_NAMES.has(k)) {
-            pointers[k] = v;
+            pointers.push({ name: k, target: String(v) });
           }
         }
       }
@@ -113,13 +113,13 @@ export const mapStructure = (layoutType, trace, rawInitialData = []) => {
       
       // If we have custom matrix traversal variables
       if (r !== null && c !== null && typeof r === 'number' && typeof c === 'number') {
-        pointers['curr'] = [r, c];
+        pointers.push({ name: 'curr', target: `${r}-${c}` });
       }
     } else if (layoutType === 'TREE' || layoutType === 'LINKED_LIST' || layoutType === 'GRAPH') {
       // Map variables holding node ID string values (like "node_1")
       for (const [k, v] of Object.entries(vars)) {
         if (typeof v === 'string' && /^node_\d+$/.test(v)) {
-          pointers[k] = v;
+          pointers.push({ name: k, target: v });
           
           // Visited node tracking
           visitedNodes.add(v);
@@ -140,6 +140,10 @@ export const mapStructure = (layoutType, trace, rawInitialData = []) => {
     mappedTrace.push({
       ...step,
       pointers,
+      visited: {
+        nodes: Array.from(visitedNodes),
+        edges: visitedEdges.map(e => `${e[0]}-${e[1]}`)
+      },
       visited_nodes: Array.from(visitedNodes),
       visited_edges: [...visitedEdges]
     });

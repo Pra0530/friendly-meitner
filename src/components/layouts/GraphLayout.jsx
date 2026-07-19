@@ -89,7 +89,9 @@ const GraphLayout = ({ initial_data, pointers, currentState }) => {
         const p = positions[node.id];
         if (!p) return null;
 
-        const activePointers = Object.entries(pointers).filter(([_, pId]) => pId === node.id);
+        const activePointers = Array.isArray(pointers)
+          ? pointers.filter(p => p.target === node.id).map(p => [p.name, p.target])
+          : Object.entries(pointers).filter(([_, pId]) => pId === node.id);
         const isHighlighted = activePointers.length > 0;
         const isVisited = visitedNodes.includes(node.id);
 

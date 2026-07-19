@@ -3,10 +3,28 @@ import { instrumentJS, runJSSandbox } from "./jsInterpreter";
 import { runPythonSandbox } from "./pythonInterpreter";
 import { mapStructure } from "./structureMapper";
 
+const classificationCache = new Map();
+
+// A simple hash function for code strings
+const getCodeHash = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash.toString();
+};
+
 /**
  * Stage 1: Classifies the algorithm's layout type using a fast LLM call.
+ * Result is cached by source code hash.
  */
 export const classifyLayout = async (apiKey, code) => {
+  const hash = getCodeHash(code);
+  if (classificationCache.has(hash)) {
+    return classificationCache.get(hash);
+  }
+
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
 
@@ -80,7 +98,7 @@ ${code}
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1,
-        maxOutputTokens: 256,
+        maxOutputTokens: 30, // Capped tiny output token limit
       }
     });
 
@@ -88,26 +106,92 @@ ${code}
     text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     const data = JSON.parse(text);
     if (data.confidence < 0.6) {
-      return { layout: "VARIABLES", confidence: 1.0, reasoning: "Low confidence classification fallback" };
+      const fallback = { layout: "VARIABLES", confidence: 1.0, reasoning: "Low confidence classification fallback" };
+      classificationCache.set(hash, fallback);
+      return fallback;
     }
+    classificationCache.set(hash, data);
     return data;
   } catch (e) {
     console.error("Layout classification failed, falling back to VARIABLES:", e);
-    return { layout: "VARIABLES", confidence: 1.0, reasoning: "Error classification fallback" };
+    const fallback = { layout: "VARIABLES", confidence: 1.0, reasoning: "Error classification fallback" };
+    classificationCache.set(hash, fallback);
+    return fallback;
   }
 };
 
 /**
- * Stage 4: Generates natural language explanations in batches of 10 steps to save quota.
+ * Stage E: Pure JS/Python template matching for simple code statements.
+ */
+const getTemplateExplanation = (codeLines, step) => {
+  const lineStr = (codeLines[step.line - 1] || "").trim();
+  const vars = step.variables || {};
+
+  // 1. Simple increment / decrement
+  let match = lineStr.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:\+\+|\+= 1|= \1 \+ 1);?$/);
+  if (match) {
+    const varName = match[1];
+    return `${varName} is incremented to ${vars[varName] !== undefined ? vars[varName] : 'next value'}.`;
+  }
+  
+  match = lineStr.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:--|-= 1|= \1 - 1);?$/);
+  if (match) {
+    const varName = match[1];
+    return `${varName} is decremented to ${vars[varName] !== undefined ? vars[varName] : 'previous value'}.`;
+  }
+
+  // 2. Simple assignment of values
+  match = lineStr.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([a-zA-Z0-9_"'-]+);?$/);
+  if (match) {
+    const varName = match[1];
+    const val = match[2];
+    return `${varName} is set to ${val}.`;
+  }
+
+  // 3. Pointer transitions
+  match = lineStr.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*\1\.(left|right|next);?$/);
+  if (match) {
+    const pName = match[1];
+    const direction = match[2];
+    return `Move pointer '${pName}' to its ${direction} child.`;
+  }
+
+  // 4. Return statement
+  match = lineStr.match(/^return\s*(.*);?$/);
+  if (match) {
+    return `Return ${match[1] || 'result'}.`;
+  }
+
+  return null;
+};
+
+/**
+ * Stage E: Generates explanations. Trivial steps are resolved in code.
+ * Non-trivial steps are batched and narrated by Gemini 1.5 Flash 8b.
  */
 export const generateNarratives = async (apiKey, code, trace) => {
+  const codeLines = code.split('\n');
+
+  // Map templated explanations first
+  const missingExplanations = [];
+  trace.forEach(step => {
+    const temp = getTemplateExplanation(codeLines, step);
+    if (temp) {
+      step.explanation = temp;
+    } else {
+      missingExplanations.push(step);
+    }
+  });
+
+  if (missingExplanations.length === 0) return;
+
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
 
   const batchSize = 10;
   const batches = [];
-  for (let i = 0; i < trace.length; i += batchSize) {
-    batches.push(trace.slice(i, i + batchSize));
+  for (let i = 0; i < missingExplanations.length; i += batchSize) {
+    batches.push(missingExplanations.slice(i, i + batchSize));
   }
 
   const promises = batches.map(async (batch) => {
@@ -118,7 +202,7 @@ Given the source code and a batch of real execution trace steps (line numbers an
 CRITICAL INSTRUCTIONS:
 - Do not compute new values. ONLY describe what already happened or is being checked in the given step.
 - Ground your explanations strictly in the variables provided.
-- Keep descriptions short, clear, and focused on the code logic at that line.
+- Keep descriptions extremely short, clear, and focused on the code logic at that line.
 - The output MUST be a JSON array of strings, where each element corresponds to the explanation for the respective step in the batch.
 
 Source Code:
@@ -140,7 +224,7 @@ Return a strict JSON array of strings:
         generationConfig: {
           responseMimeType: "application/json",
           temperature: 0.1,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 600, // Capped to 60 tokens per step on average
         }
       });
 
@@ -186,7 +270,7 @@ export const generateExecutionTrace = async (apiKey, code, customInput = null) =
       rawTrace = data.trace;
       rawInitialData = data.initial_data;
     } else {
-      const instrumented = instrumentJS(code, customInput);
+      const instrumented = await instrumentJS(code, customInput);
       const data = await runJSSandbox(instrumented);
       rawTrace = data.trace;
       rawInitialData = data.initial_data;

@@ -38,6 +38,11 @@ export const runPythonSandbox = async (code, customInput = null) => {
 import sys
 import json
 
+# Block dangerous imports to sandbox the execution
+blocked_modules = ['os', 'subprocess', 'socket', 'urllib', 'requests', 'shutil', 'builtins.eval']
+for mod in blocked_modules:
+    sys.modules[mod] = None
+
 trace_steps = []
 object_ids = {}
 all_nodes = []
@@ -82,24 +87,48 @@ def serialize_val(val):
     except Exception:
         return str(val)
 
+user_code = """${escapedCode}"""
+user_code_lines = user_code.split('\\n')
+
 def tracer(frame, event, arg):
     if event == 'line':
         line = frame.f_lineno
         # Capture variables in local scope
         variables = {}
         for k, v in frame.f_locals.items():
-            if k.startswith('__') or k in ['trace_steps', 'tracer', 'sys', 'json', 'object_ids', 'all_nodes', 'get_object_id', 'serialize_val']:
+            if k.startswith('__') or k in ['trace_steps', 'tracer', 'sys', 'json', 'object_ids', 'all_nodes', 'get_object_id', 'serialize_val', 'user_code_lines']:
                 continue
             variables[k] = serialize_val(v)
         
+        # Determine stack depth
+        depth = 0
+        f = frame
+        while f:
+            depth += 1
+            f = f.f_back
+
+        # Classify the statement type/action
+        line_idx = line - 1
+        line_str = user_code_lines[line_idx].strip() if 0 <= line_idx < len(user_code_lines) else ""
+        
+        action = "assignment"
+        if line_str.startswith(("if ", "elif ", "else:")):
+            action = "condition"
+        elif line_str.startswith(("while ", "for ")):
+            action = "loop"
+        elif line_str.startswith("return"):
+            action = "return"
+        elif "(" in line_str and ")" in line_str and not "=" in line_str:
+            action = "call"
+
         trace_steps.append({
             "step": len(trace_steps),
             "line": line,
-            "variables": variables
+            "action": action,
+            "variables": variables,
+            "depth": depth
         })
     return tracer
-
-user_code = """${escapedCode}"""
 
 # Inject and run tracer
 sys.settrace(tracer)
@@ -109,7 +138,9 @@ except Exception as e:
     trace_steps.append({
         "step": len(trace_steps),
         "line": -1,
+        "action": "return",
         "variables": {},
+        "depth": 0,
         "error": str(e)
     })
 finally:

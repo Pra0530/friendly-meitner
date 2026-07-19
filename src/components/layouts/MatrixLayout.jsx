@@ -16,13 +16,22 @@ const MatrixLayout = ({ initial_data, pointers, currentState }) => {
 
   // Process pointers: group them by cell coordinates [row, col]
   const cellPointers = {}; // key: "row,col", value: [pointer names...]
-  Object.entries(pointers).forEach(([pName, coords]) => {
-    if (Array.isArray(coords) && coords.length === 2) {
+  const pEntries = Array.isArray(pointers)
+    ? pointers.map(p => {
+        const coords = p.target.split('-').map(Number);
+        return [p.name, coords];
+      })
+    : Object.entries(pointers);
+
+  pEntries.forEach(([pName, coords]) => {
+    if (Array.isArray(coords) && coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
       const key = `${coords[0]},${coords[1]}`;
       if (!cellPointers[key]) cellPointers[key] = [];
       cellPointers[key].push(pName);
     }
   });
+
+  const pNamesList = Array.isArray(pointers) ? pointers.map(p => p.name) : Object.keys(pointers);
 
   return (
     <div style={{
@@ -39,30 +48,28 @@ const MatrixLayout = ({ initial_data, pointers, currentState }) => {
           {row.map((val, cIdx) => {
             const key = `${rIdx},${cIdx}`;
             const activePointers = cellPointers[key] || [];
-            
-            // "Star" logic for highlighting
-            const isHighlighted = val === "*" || val === 1 || val === "1" || val === true || val === "true";
-            
-            let cellStyle = {
-              position: 'relative',
-              width: '50px',
-              height: '50px',
+            const isHighlighted = activePointers.length > 0;
+
+            const cellStyle = {
+              width: '48px',
+              height: '48px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: '8px',
               border: '1px solid var(--border-glass)',
-              background: isHighlighted ? 'rgba(34, 197, 94, 0.2)' : 'rgba(0, 0, 0, 0.2)', // Green or dark
-              color: isHighlighted ? 'var(--success-color)' : 'var(--text-secondary)',
-              fontWeight: isHighlighted ? 'bold' : 'normal',
-              fontSize: '18px',
-              transition: 'all 0.3s ease',
+              background: 'var(--bg-surface)',
+              borderRadius: '6px',
+              position: 'relative',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: 'var(--text-primary)',
+              transition: 'all 0.2s ease',
               boxShadow: isHighlighted ? '0 0 10px rgba(34, 197, 94, 0.4)' : 'none'
             };
 
             // If a pointer is on this cell, give it a prominent border
             if (activePointers.length > 0) {
-              const pIndex = Object.keys(pointers).indexOf(activePointers[0]);
+              const pIndex = pNamesList.indexOf(activePointers[0]);
               const color = POINTER_COLORS[pIndex % POINTER_COLORS.length];
               cellStyle.border = `2px solid ${color}`;
               cellStyle.boxShadow = `0 0 12px ${color}80`; // 50% opacity hex
@@ -87,7 +94,7 @@ const MatrixLayout = ({ initial_data, pointers, currentState }) => {
                     zIndex: 10
                   }}>
                     {activePointers.map((pName, i) => {
-                      const pIdx = Object.keys(pointers).indexOf(pName);
+                      const pIdx = pNamesList.indexOf(pName);
                       const color = POINTER_COLORS[pIdx % POINTER_COLORS.length];
                       return (
                         <motion.div
