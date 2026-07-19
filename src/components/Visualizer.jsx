@@ -61,7 +61,7 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '20px', overflowY: 'auto' }}>
       <div className="controls-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Zap size={20} color="var(--warning-color)" />
@@ -171,12 +171,12 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
       {/* Insight Panel */}
       <InsightPanel insight={insight} />
 
-      {/* Dynamic Layout Canvas — must have flex:1 + minHeight:0 to fill space */}
+      {/* Dynamic Layout Canvas — must have flex:1 + minHeight:260px to fill space without collapsing */}
       <div
         className="canvas-area"
         style={{
           flex: 1,
-          minHeight: 0,
+          minHeight: '260px',
           overflow: 'auto',
           display: 'flex',
           alignItems: layout_type === 'variables' ? 'flex-start' : 'center',
