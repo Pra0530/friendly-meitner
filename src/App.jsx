@@ -9,7 +9,7 @@ import TerminalEmulator from './components/TerminalEmulator';
 import StatusBar from './components/StatusBar';
 import { generateExecutionTrace } from './services/aiService';
 import { pluginManager } from './services/pluginManager';
-import { Key, BookOpen, Cpu } from 'lucide-react';
+import { Key, BookOpen, Cpu, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const getInitialKey = () => {
@@ -36,6 +36,7 @@ function App() {
   const [isFindOpen, setIsFindOpen] = useState(false);
   const [isSplitView, setIsSplitView] = useState(false);
   const [diagnostics, setDiagnostics] = useState([]);
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
 
   const [aiData, setAiData] = useState(null);
 
@@ -317,13 +318,45 @@ function App() {
             </div>
           )}
 
-          {/* Terminal at the bottom */}
-          <div style={{ flexShrink: 0 }}>
-            <TerminalEmulator
-              code={editorCode}
-              onPlay={handlePlay}
-              lspDiagnostics={diagnostics}
-            />
+          {/* Collapsible Terminal */}
+          <div style={{ flexShrink: 0, marginTop: '12px' }}>
+            <button
+              onClick={() => setIsTerminalOpen(v => !v)}
+              style={{
+                width: '100%',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid var(--border-glass)',
+                borderRadius: isTerminalOpen ? '8px 8px 0 0' : '8px',
+                padding: '8px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+                fontSize: '12px',
+                fontWeight: '600',
+                letterSpacing: '0.8px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px' }}>🖥️</span>
+                <span>INTEGRATED TERMINAL</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '400' }}>
+                  {isTerminalOpen ? "Click to hide" : "Click to open"}
+                </span>
+                {isTerminalOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </div>
+            </button>
+
+            {isTerminalOpen && (
+              <TerminalEmulator
+                code={editorCode}
+                onPlay={handlePlay}
+                lspDiagnostics={diagnostics}
+              />
+            )}
           </div>
         </div>
       </div>
