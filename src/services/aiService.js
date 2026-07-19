@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { instrumentJS, runJSSandbox } from "./jsInterpreter";
-import { runPythonSandbox } from "./pythonInterpreter";
-import { mapStructure } from "./structureMapper";
+import { instrumentJS, runJSSandbox } from "./jsInterpreter.js";
+import { runPythonSandbox } from "./pythonInterpreter.js";
+import { mapStructure } from "./structureMapper.js";
 
 const classificationCache = new Map();
 
@@ -16,6 +16,56 @@ const getCodeHash = (str) => {
 };
 
 /**
+ * Helper to call Gemini API supporting both standard API keys and OAuth Access Tokens (AQ.* / ya29.*)
+ */
+const callGeminiAPI = async (apiKey, modelName, prompt, responseMimeType = "text/plain", maxOutputTokens = 2048) => {
+  const isToken = apiKey.startsWith("AQ.") || apiKey.startsWith("ya29.");
+  
+  if (isToken) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType,
+          temperature: 0.1,
+          maxOutputTokens
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Google API returned status ${response.status}: ${errText}`);
+    }
+    
+    const result = await response.json();
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      throw new Error("Invalid API response format: empty text candidates");
+    }
+    return text;
+  } else {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const modelObj = genAI.getGenerativeModel({ model: modelName });
+    const result = await modelObj.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType,
+        temperature: 0.1,
+        maxOutputTokens,
+      }
+    });
+    return result.response.text();
+  }
+};
+
+/**
  * Stage 1: Classifies the algorithm's layout type using a fast LLM call.
  * Result is cached by source code hash.
  */
@@ -24,9 +74,6 @@ export const classifyLayout = async (apiKey, code) => {
   if (classificationCache.has(hash)) {
     return classificationCache.get(hash);
   }
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
 
   const prompt = `
 You are an expert algorithmic analyzer.
@@ -93,16 +140,7 @@ ${code}
 `;
 
   try {
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.1,
-        maxOutputTokens: 30, // Capped tiny output token limit
-      }
-    });
-
-    let text = result.response.text();
+    let text = await callGeminiAPI(apiKey, "gemini-1.5-flash", prompt, "application/json", 30);
     text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     const data = JSON.parse(text);
     if (data.confidence < 0.6) {
@@ -167,7 +205,7 @@ const getTemplateExplanation = (codeLines, step) => {
 
 /**
  * Stage E: Generates explanations. Trivial steps are resolved in code.
- * Non-trivial steps are batched and narrated by Gemini 1.5 Flash 8b.
+ * Non-trivial steps are batched and narrated by Gemini 1.5 Flash.
  */
 export const generateNarratives = async (apiKey, code, trace) => {
   const codeLines = code.split('\n');
@@ -184,9 +222,6 @@ export const generateNarratives = async (apiKey, code, trace) => {
   });
 
   if (missingExplanations.length === 0) return;
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
 
   const batchSize = 10;
   const batches = [];
@@ -219,16 +254,7 @@ Return a strict JSON array of strings:
 `;
 
     try {
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.1,
-          maxOutputTokens: 600, // Capped to 60 tokens per step on average
-        }
-      });
-
-      let text = result.response.text();
+      let text = await callGeminiAPI(apiKey, "gemini-1.5-flash", prompt, "application/json", 600);
       text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
       const explanations = JSON.parse(text);
       if (Array.isArray(explanations)) {
