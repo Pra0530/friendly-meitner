@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, SkipBack, SkipForward, Zap, RotateCcw } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Zap, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import ArrayLayout from './layouts/ArrayLayout';
 import TreeLayout from './layouts/TreeLayout';
 import MatrixLayout from './layouts/MatrixLayout';
@@ -14,6 +14,7 @@ import InsightPanel from './InsightPanel';
 
 const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight }) => {
   const [playbackSpeed, setPlaybackSpeed] = React.useState(1);
+  const [isVoiceEnabled, setIsVoiceEnabled] = React.useState(false);
   const layout_type = (aiData?.layout_type || 'ARRAY').toLowerCase();
   const initial_data = aiData?.initial_data || [];
   const root_id = aiData?.root_id;
@@ -42,13 +43,58 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
 
   const explanation = currentState?.explanation || "";
 
+  useEffect(() => {
+    if (isVoiceEnabled && explanation) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(explanation);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+  }, [step, explanation, isVoiceEnabled]);
+
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '20px' }}>
-      <div className="controls-header">
+      <div className="controls-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Zap size={20} color="var(--warning-color)" />
-          <h2 style={{ fontSize: '18px', fontWeight: '600' }} className="text-gradient">Live Execution</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: '600', margin: 0 }} className="text-gradient">Live Execution</h2>
         </div>
+        
+        {/* Voice Narration Button */}
+        <button 
+          onClick={() => {
+            const next = !isVoiceEnabled;
+            setIsVoiceEnabled(next);
+            if (!next) {
+              window.speechSynthesis.cancel();
+            }
+          }}
+          style={{
+            background: isVoiceEnabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+            border: `1px solid ${isVoiceEnabled ? 'var(--success-color)' : 'var(--border-glass)'}`,
+            borderRadius: '8px',
+            padding: '6px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: isVoiceEnabled ? 'var(--success-color)' : 'var(--text-secondary)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            fontSize: '13px',
+            fontWeight: '500'
+          }}
+          title={isVoiceEnabled ? "Disable Voice Narration" : "Enable Voice Narration"}
+        >
+          {isVoiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          <span>{isVoiceEnabled ? "Voice On" : "Voice Off"}</span>
+        </button>
       </div>
       
       <PlaybackControls 
