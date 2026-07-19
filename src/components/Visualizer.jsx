@@ -108,6 +108,61 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
         setPlaybackSpeed={setPlaybackSpeed}
       />
 
+      {/* ── Unified Current Step Indicator ── */}
+      {trace.length > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '10px 16px',
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1.5px solid var(--border-glass)',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          marginTop: '12px',
+          flexShrink: 0
+        }}>
+          <span style={{
+            fontSize: '11px',
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--text-muted)',
+            background: 'rgba(255, 255, 255, 0.04)',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            flexShrink: 0
+          }}>
+            L{currentState?.line}
+          </span>
+          <code style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '13px',
+            color: '#e2e8f0',
+            flex: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {currentState?.line_text || trace[step]?.line_text || explanation || 'Executing statement...'}
+          </code>
+          {currentState?.action && (
+            <span style={{
+              fontSize: '10px',
+              fontWeight: '700',
+              color: 
+                currentState.action === 'condition' ? '#fbbf24' :
+                currentState.action === 'loop' ? '#a78bfa' :
+                currentState.action === 'return' ? '#f87171' :
+                currentState.action === 'call' ? '#34d399' : '#60a5fa',
+              letterSpacing: '0.8px',
+              textTransform: 'uppercase',
+              flexShrink: 0
+            }}>
+              {currentState.action}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Variables Display — hidden for VARIABLES layout (shown inside canvas instead) */}
       {layout_type !== 'variables' && (
         <VariablePanel traceHistory={trace.slice(0, step + 1)} currentVariables={variables} />

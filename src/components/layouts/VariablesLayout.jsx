@@ -72,51 +72,6 @@ const VariablesLayout = ({ currentState, trace, step }) => {
       overflow: 'hidden'
     }}>
 
-      {/* ── Current Line Banner ── */}
-      <motion.div
-        key={`line-${step}`}
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25 }}
-        style={{
-          background: meta.bg,
-          border: `1.5px solid ${meta.color}`,
-          borderRadius: '10px',
-          padding: '10px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          flexShrink: 0
-        }}
-      >
-        <span style={{
-          background: meta.color,
-          color: '#000',
-          fontSize: '10px',
-          fontWeight: '800',
-          letterSpacing: '1px',
-          padding: '2px 8px',
-          borderRadius: '4px',
-          flexShrink: 0
-        }}>
-          {meta.label}
-        </span>
-        <code style={{
-          color: '#e2e8f0',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '14px',
-          flex: 1,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
-        }}>
-          {lineText || '···'}
-        </code>
-        <span style={{ color: 'var(--text-muted)', fontSize: '11px', flexShrink: 0 }}>
-          line {currentState?.line}
-        </span>
-      </motion.div>
-
       {/* ── Condition TRUE / FALSE ── */}
       <AnimatePresence mode="wait">
         {action === 'condition' && (
