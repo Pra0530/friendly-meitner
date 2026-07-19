@@ -28,7 +28,7 @@ function searchBST(root, target) {
 const root = { val: 4, left: { val: 2, left: null, right: null }, right: { val: 7, left: null, right: null } };
 searchBST(root, 7);`;
 
-  const [code, setCode] = useState(DEFAULT_CODE);
+  const [code, setCode] = useState('');
   const [diagnostics, setDiagnostics] = useState([]);
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(500);

@@ -164,7 +164,9 @@ finally:
     sys.settrace(None)
 
 flat_nodes = []
-for node in all_nodes:
+node_idx = 0
+while node_idx < len(all_nodes):
+    node = all_nodes[node_idx]
     flat_nodes.append({
         "id": get_object_id(node),
         "val": getattr(node, 'val', getattr(node, 'value', None)),
@@ -173,6 +175,7 @@ for node in all_nodes:
         "next": get_object_id(getattr(node, 'next', None)),
         "neighbors": [get_object_id(n) for n in getattr(node, 'neighbors', [])] if hasattr(node, 'neighbors') and isinstance(getattr(node, 'neighbors'), list) else None
     })
+    node_idx += 1
 
 result = {
     "trace": trace_steps,
