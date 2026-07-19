@@ -75,6 +75,37 @@ export const classifyLayout = async (apiKey, code) => {
     return classificationCache.get(hash);
   }
 
+  // ── DETERMINISTIC OVERRIDES (Prevents LLM Misclassification) ──
+  const codeLower = code.toLowerCase();
+  
+  // 1. Binary Tree
+  if (codeLower.includes('.left') || codeLower.includes('.right') || codeLower.includes('left=') || codeLower.includes('right=')) {
+    const res = { layout: "TREE", confidence: 1.0, reasoning: "Deterministic override: Code contains left/right child references indicative of a binary tree." };
+    classificationCache.set(hash, res);
+    return res;
+  }
+
+  // 2. Linked List
+  if (codeLower.includes('.next') || codeLower.includes('next=')) {
+    const res = { layout: "LINKED_LIST", confidence: 1.0, reasoning: "Deterministic override: Code contains .next pointer traversal indicative of a linked list." };
+    classificationCache.set(hash, res);
+    return res;
+  }
+
+  // 3. Matrix / Grid
+  if (codeLower.includes('[row]') || codeLower.includes('[col]') || codeLower.includes('grid[') || codeLower.includes('matrix[')) {
+    const res = { layout: "MATRIX", confidence: 1.0, reasoning: "Deterministic override: Code references row/column coordinates or grid structures." };
+    classificationCache.set(hash, res);
+    return res;
+  }
+
+  // 4. Stack
+  if (codeLower.includes('stack.push') || codeLower.includes('stack.pop') || (codeLower.includes('.push(') && codeLower.includes('.pop(') && codeLower.includes('stack'))) {
+    const res = { layout: "STACK", confidence: 1.0, reasoning: "Deterministic override: Code performs explicit stack operations push and pop." };
+    classificationCache.set(hash, res);
+    return res;
+  }
+
   const prompt = `
 You are an expert algorithmic analyzer.
 Analyze the following source code and classify it into one of the supported visualizer layout types.

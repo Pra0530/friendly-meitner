@@ -354,16 +354,20 @@ export const runJSSandbox = (instrumentedCode) => {
 
             ${instrumentedCode}
             
-            const flatNodes = __all_nodes.map(node => {
-              return {
+            const flatNodes = [];
+            let i = 0;
+            while (i < __all_nodes.length) {
+              const node = __all_nodes[i];
+              flatNodes.push({
                 id: __get_node_id(node),
                 val: node.val !== undefined ? node.val : node.value,
                 left: __get_node_id(node.left),
                 right: __get_node_id(node.right),
                 next: __get_node_id(node.next),
                 neighbors: Array.isArray(node.neighbors) ? node.neighbors.map(__get_node_id) : undefined
-              };
-            });
+              });
+              i++;
+            }
 
             window.parent.postMessage({ type: 'done', initial_data: flatNodes }, '*');
           } catch (err) {

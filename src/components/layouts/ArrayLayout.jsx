@@ -26,10 +26,12 @@ const ArrayLayout = ({ initial_data, pointers, layout_type, traceHistory = [] })
     }
   });
 
+  const typeUpper = (layout_type || '').toUpperCase();
+
   return (
     <div style={{ 
       display: 'flex', 
-      gap: layout_type === 'ARRAY' ? '0px' : '24px', 
+      gap: typeUpper === 'ARRAY' ? '0px' : '24px', 
       position: 'relative', 
       alignItems: 'center',
       justifyContent: 'center',
@@ -42,8 +44,8 @@ const ArrayLayout = ({ initial_data, pointers, layout_type, traceHistory = [] })
           : Object.entries(pointers).filter(([_, pIdx]) => pIdx === idx);
         
         let nodeStyle = {
-          borderRadius: layout_type === 'ARRAY' ? '0px' : '12px',
-          borderLeftWidth: layout_type === 'ARRAY' && idx > 0 ? '0px' : '2px',
+          borderRadius: typeUpper === 'ARRAY' ? '0px' : '12px',
+          borderLeftWidth: typeUpper === 'ARRAY' && idx > 0 ? '0px' : '2px',
           minWidth: '64px',
           height: '64px',
           display: 'flex',
@@ -118,7 +120,7 @@ const ArrayLayout = ({ initial_data, pointers, layout_type, traceHistory = [] })
               </motion.div>
             </div>
 
-            {layout_type === 'LINKED_LIST' && idx < initial_data.length - 1 && (
+            {typeUpper === 'LINKED_LIST' && idx < initial_data.length - 1 && (
               <div style={{ width: '40px', height: '2px', background: 'var(--text-muted)', position: 'relative', margin: '0 4px' }}>
                 <div style={{ position: 'absolute', right: '0px', top: '-4px', width: '10px', height: '10px', borderTop: '2px solid var(--text-muted)', borderRight: '2px solid var(--text-muted)', transform: 'rotate(45deg)' }} />
               </div>
