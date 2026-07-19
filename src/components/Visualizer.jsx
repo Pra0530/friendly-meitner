@@ -8,7 +8,7 @@ import StackLayout from './layouts/StackLayout';
 import GraphLayout from './layouts/GraphLayout';
 import SystemLayout from './layouts/SystemLayout';
 import VariablesLayout from './layouts/VariablesLayout';
-import TraceLog from './TraceLog';
+
 import PlaybackControls from './PlaybackControls';
 import VariablePanel from './VariablePanel';
 import InsightPanel from './InsightPanel';
@@ -224,8 +224,6 @@ const Visualizer = ({ step, setStep, isPlaying, setIsPlaying, aiData, insight })
         </motion.div>
       )}
 
-      {/* Output Console */}
-      <TraceLog trace={trace} step={step} setStep={setStep} MAX_STEP={MAX_STEP} />
     </div>
   );
 };
