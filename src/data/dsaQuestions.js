@@ -1,5 +1,54 @@
 export const dsaQuestions = [
   {
+    category: "Interactive Visualizers & Automation",
+    questions: [
+      {
+        title: "Find if Two Rectangles Overlap",
+        link: "https://www.geeksforgeeks.org/find-two-rectangles-overlap/",
+        code: `class Point {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+}
+
+function doOverlap(l1, r1, l2, r2) {
+  // If one rectangle is to the left of the other
+  if (l1.x > r2.x || l2.x > r1.x) {
+    return false;
+  }
+
+  // If one rectangle is above the other
+  if (r1.y > l2.y || r2.y > l1.y) {
+    return false;
+  }
+
+  return true;
+}
+
+let l1 = new Point(0, 10);
+let r1 = new Point(10, 0);
+let l2 = new Point(5, 5);
+let r2 = new Point(15, 0);
+
+console.log("Overlap:", doOverlap(l1, r1, l2, r2));`
+      },
+      {
+        title: "Web Automation & Testing Logic",
+        code: `// Web Testing Automation Logic Example
+async function runLoginTest(page) {
+  await page.goto('https://mysandboxapp.com/login');
+  await page.locator('#username').fill('admin');
+  await page.locator('#password').fill('password123');
+  await page.locator('#login-btn').click();
+  
+  const msg = await page.locator('#login-message').innerText();
+  console.log("Assertion result:", msg.includes('Login Successful'));
+}`
+      }
+    ]
+  },
+  {
     category: "13 Must-Know Data Structures",
     questions: [
       { title: "Array" },

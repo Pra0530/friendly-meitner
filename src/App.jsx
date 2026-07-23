@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import CodeEditor from './components/CodeEditor';
 import Visualizer from './components/Visualizer';
 import QuestionBank from './components/QuestionBank';
+import WebAutomationPlayground from './components/WebAutomationPlayground';
+import RectangleOverlapVisualizer from './components/RectangleOverlapVisualizer';
 
 import CommandPalette from './components/CommandPalette';
 import FindReplace from './components/FindReplace';
@@ -32,6 +34,7 @@ function App() {
   const [editorCode, setEditorCode] = useState('');
   const [activeQuestion, setActiveQuestion] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [appMode, setAppMode] = useState('ide'); // 'ide', 'web-testing', 'rect-overlap'
 
   // IDE UX feature states
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -92,6 +95,14 @@ function App() {
     setStep(0);
     setIsPlaying(false);
     setAiData(null);
+
+    if (q.title && q.title.toLowerCase().includes('rectangle')) {
+      setAppMode('rect-overlap');
+    } else if (q.title && q.title.toLowerCase().includes('automation')) {
+      setAppMode('web-testing');
+    } else {
+      setAppMode('ide');
+    }
 
     if (q.code) {
       setEditorInitialCode(q.code);
@@ -196,10 +207,25 @@ function App() {
         >
           {/* Control bar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexShrink: 0 }}>
-            <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-              <span>⌘P palette</span>
-              <span>⌘F find</span>
-              <span>⌘\ split</span>
+            <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.4)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <button 
+                onClick={() => setAppMode('ide')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${appMode === 'ide' ? 'bg-blue-600 text-white shadow' : 'text-neutral-400 hover:text-white'}`}
+              >
+                ⚡ DSA Visualizer
+              </button>
+              <button 
+                onClick={() => setAppMode('web-testing')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${appMode === 'web-testing' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-400 hover:text-white'}`}
+              >
+                🧪 Web Automation
+              </button>
+              <button 
+                onClick={() => setAppMode('rect-overlap')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${appMode === 'rect-overlap' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-400 hover:text-white'}`}
+              >
+                📐 Rectangle Overlap
+              </button>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <Button 
@@ -247,7 +273,15 @@ function App() {
             </div>
           )}
 
-          {aiData ? (
+          {appMode === 'web-testing' ? (
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <WebAutomationPlayground />
+            </div>
+          ) : appMode === 'rect-overlap' ? (
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <RectangleOverlapVisualizer />
+            </div>
+          ) : aiData ? (
             <>
               {/* Visualizer grows */}
               <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', margin: '8px 0' }}>
