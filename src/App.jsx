@@ -2,14 +2,13 @@ import React, { useState, useEffect } from 'react';
 import CodeEditor from './components/CodeEditor';
 import Visualizer from './components/Visualizer';
 import QuestionBank from './components/QuestionBank';
-import WebAutomationPlayground from './components/WebAutomationPlayground';
-import RectangleOverlapVisualizer from './components/RectangleOverlapVisualizer';
+import LiveAnalysisPanel from './components/LiveAnalysisPanel';
 
 import CommandPalette from './components/CommandPalette';
 import FindReplace from './components/FindReplace';
 import TerminalEmulator from './components/TerminalEmulator';
 import StatusBar from './components/StatusBar';
-import { generateExecutionTrace } from './services/aiService';
+import { generateExecutionTrace, detectAlgorithmCategory, analyzeApproachAndAlternatives } from './services/aiService';
 import { pluginManager } from './services/pluginManager';
 import { Key, BookOpen, Cpu, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -33,17 +32,30 @@ function App() {
   const [editorInitialCode, setEditorInitialCode] = useState(null);
   const [editorCode, setEditorCode] = useState('');
   const [activeQuestion, setActiveQuestion] = useState(null);
-  const [errorMessage, setErrorMessage] = useState(null);
-  const [appMode, setAppMode] = useState('ide'); // 'ide', 'web-testing', 'rect-overlap'
-
-  // IDE UX feature states
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isFindOpen, setIsFindOpen] = useState(false);
-  const [isSplitView, setIsSplitView] = useState(false);
-  const [diagnostics, setDiagnostics] = useState([]);
-  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
-
   const [aiData, setAiData] = useState(null);
+  const [detectedCategory, setDetectedCategory] = useState('general-dsa');
+  const [analysisData, setAnalysisData] = useState(null);
+
+  // ~800ms Debounced Keystroke Pattern & Approach Detection
+  useEffect(() => {
+    if (!editorCode) return;
+    const cat = detectAlgorithmCategory(editorCode);
+    setDetectedCategory(cat);
+
+    const timer = setTimeout(async () => {
+      setIsAnalyzing(true);
+      try {
+        const data = await analyzeApproachAndAlternatives(apiKey, editorCode, cat);
+        setAnalysisData(data);
+      } catch (err) {
+        console.error("Analysis Error:", err);
+      } finally {
+        setIsAnalyzing(false);
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [editorCode, apiKey]);
 
   // Register sandboxed plugins (lazy — Worker only spawns if browser supports it)
   useEffect(() => {
@@ -200,32 +212,17 @@ function App() {
           />
         </div>
 
-        {/* ── Right: Visualizer Column ── */}
+        {/* ── Right: Live Analysis & Dynamic Visualizer Panel ── */}
         <div
           className="glass-panel visualizer-panel"
           style={{ display: 'flex', flexDirection: 'column', gap: '0', padding: '20px', overflow: 'hidden' }}
         >
           {/* Control bar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexShrink: 0 }}>
-            <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.4)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <button 
-                onClick={() => setAppMode('ide')}
-                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${appMode === 'ide' ? 'bg-blue-600 text-white shadow' : 'text-neutral-400 hover:text-white'}`}
-              >
-                ⚡ DSA Visualizer
-              </button>
-              <button 
-                onClick={() => setAppMode('web-testing')}
-                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${appMode === 'web-testing' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-400 hover:text-white'}`}
-              >
-                🧪 Web Automation
-              </button>
-              <button 
-                onClick={() => setAppMode('rect-overlap')}
-                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${appMode === 'rect-overlap' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-400 hover:text-white'}`}
-              >
-                📐 Rectangle Overlap
-              </button>
+            <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+              <span>⌘P palette</span>
+              <span>⌘F find</span>
+              <span>⌘\ split</span>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <Button 
@@ -258,9 +255,6 @@ function App() {
                 <div className="text-neutral-300 font-mono text-[12px] break-all leading-relaxed">
                   {errorMessage}
                 </div>
-                <div className="text-neutral-500 text-xs mt-2 font-sans">
-                  💡 Make sure your code is complete, self-contained, and runs successfully in a standard browser environment (e.g. no Node.js system imports like 'playwright').
-                </div>
               </div>
               <Button
                 variant="ghost"
@@ -273,86 +267,20 @@ function App() {
             </div>
           )}
 
-          {appMode === 'web-testing' ? (
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              <WebAutomationPlayground />
-            </div>
-          ) : appMode === 'rect-overlap' ? (
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              <RectangleOverlapVisualizer />
-            </div>
-          ) : aiData ? (
-            <>
-              {/* Visualizer grows */}
-              <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', margin: '8px 0' }}>
-                <Visualizer
-                  step={step}
-                  setStep={setStep}
-                  isPlaying={isPlaying}
-                  setIsPlaying={setIsPlaying}
-                  aiData={aiData}
-                  insight={activeQuestion?.insight}
-                />
-              </div>
-            </>
-          ) : (
-            /* ── Onboarding Placeholder State ── */
-            <div style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '32px 20px',
-              textAlign: 'center',
-              background: 'rgba(255, 255, 255, 0.01)',
-              border: '1px dashed rgba(255, 255, 255, 0.05)',
-              borderRadius: '12px',
-              margin: '8px 0',
-              color: 'var(--text-secondary)',
-              minHeight: 0,
-              overflowY: 'auto'
-            }}>
-              <motion.div
-                animate={{ scale: [1, 1.06, 1] }}
-                transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '50%',
-                  background: 'rgba(96, 165, 250, 0.08)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '16px',
-                  border: '1px solid rgba(96, 165, 250, 0.25)',
-                  boxShadow: '0 0 16px rgba(96, 165, 250, 0.1)'
-                }}
-              >
-                <Cpu size={24} color="var(--accent-color)" />
-              </motion.div>
-              <h3 style={{ color: '#fff', fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
-                Ready to Visualize
-              </h3>
-              <p style={{ maxWidth: '320px', fontSize: '13px', lineHeight: '1.5', color: 'var(--text-muted)', marginBottom: '20px' }}>
-                Write or paste your algorithm on the left, then click the blue Play button (▶) to execute and see it animate step-by-step.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '280px', textAlign: 'left', fontSize: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
-                  <span style={{ color: 'var(--accent-color)', fontSize: '14px' }}>⚡</span>
-                  <span><strong>Variables:</strong> Trace locals, conditions & loops</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
-                  <span style={{ color: 'var(--accent-color)', fontSize: '14px' }}>📊</span>
-                  <span><strong>Arrays:</strong> Watch pointers & value swaps</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
-                  <span style={{ color: 'var(--accent-color)', fontSize: '14px' }}>🌳</span>
-                  <span><strong>Structures:</strong> Trees, Lists & Graphs</span>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Single-Screen Split View Live Analysis Panel */}
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <LiveAnalysisPanel
+              detectedCategory={detectedCategory}
+              analysisData={analysisData}
+              isAnalyzing={isAnalyzing}
+              aiData={aiData}
+              step={step}
+              setStep={setStep}
+              isPlaying={isPlaying}
+              setIsPlaying={setIsPlaying}
+              insight={activeQuestion?.insight}
+            />
+          </div>
 
           {/* Collapsible Terminal */}
           <div style={{ flexShrink: 0, marginTop: '12px' }}>

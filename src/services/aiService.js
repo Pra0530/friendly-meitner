@@ -16,6 +16,130 @@ const getCodeHash = (str) => {
 };
 
 /**
+ * Fast Pattern Detector (~800ms debounce target)
+ * Scans code buffer to determine category family.
+ */
+export const detectAlgorithmCategory = (code) => {
+  if (!code) return 'general-dsa';
+  const c = code.toLowerCase();
+
+  // 1. Rectangle Overlap
+  if (
+    c.includes('overlap') ||
+    c.includes('point') ||
+    c.includes('rect') ||
+    (c.includes('l1') && c.includes('r1')) ||
+    (c.includes('l2') && c.includes('r2')) ||
+    (c.includes('x1') && c.includes('x2') && c.includes('y1') && c.includes('y2'))
+  ) {
+    return 'rectangle-overlap';
+  }
+
+  return 'general-dsa';
+};
+
+/**
+ * Analyzes code approach and fetches 1-2 alternative approaches.
+ */
+export const analyzeApproachAndAlternatives = async (apiKey, code, category) => {
+  if (category === 'rectangle-overlap') {
+    return {
+      detectedCategory: 'rectangle-overlap',
+      approachName: "De Morgan's Separation Bounds",
+      approachSummary: "Evaluates the 4 conditions under which two rectangles DO NOT overlap to verify collision.",
+      alternativeApproaches: [
+        {
+          name: "Axis-Aligned Bounding Box (AABB) Min/Max Intersection",
+          summary: "Calculates the exact overlapping rectangle boundaries using Math.max(x1, x3) and Math.min(x2, x4)."
+        },
+        {
+          name: "Separating Axis Theorem (SAT)",
+          summary: "Projects 2D shapes onto perpendicular axes to check for overlap, suitable for rotated polygons."
+        }
+      ],
+      steps: [
+        "1. Define top-left and bottom-right points for Rect 1 and Rect 2",
+        "2. Check horizontal separation (l1.x > r2.x or l2.x > r1.x)",
+        "3. Check vertical separation (r1.y > l2.y or r2.y > l1.y)",
+        "4. If no separation condition is met, return True (Overlapping)"
+      ]
+    };
+  }
+
+  if (category === 'web-automation') {
+    return {
+      detectedCategory: 'web-automation',
+      approachName: "Playwright / DOM Automation Pattern",
+      approachSummary: "Emulates user actions (typing, clicking) and asserts UI DOM state updates.",
+      alternativeApproaches: [
+        {
+          name: "Cypress Real-Time Event Bus Simulation",
+          summary: "Runs tests directly inside the browser event loop for rapid E2E feedback."
+        },
+        {
+          name: "Selenium WebDriver Protocol",
+          summary: "Uses HTTP JSON wire protocol commands to automate cross-browser browser sessions."
+        }
+      ],
+      steps: [
+        "1. Navigate to target URL endpoint",
+        "2. Query target element by CSS selector (#username, #password)",
+        "3. Dispatch user events (fill, click, check)",
+        "4. Assert DOM element state and visibility"
+      ]
+    };
+  }
+
+  // General DSA Fallback / Gemini AI Call
+  if (!apiKey) {
+    return {
+      detectedCategory: 'general-dsa',
+      approachName: "Algorithmic Code Trace",
+      approachSummary: "Analyzes variable assignments, loops, and conditional state changes.",
+      alternativeApproaches: [
+        {
+          name: "Iterative / Space Optimized Approach",
+          summary: "Reduces call stack overhead by using an explicit stack/queue."
+        }
+      ],
+      steps: ["1. Read code inputs", "2. Execute logic loop", "3. Return result"]
+    };
+  }
+
+  try {
+    const prompt = `Analyze this code and return JSON:
+{
+  "approachName": "short approach title",
+  "approachSummary": "1 sentence explanation of current approach",
+  "alternativeApproaches": [
+    { "name": "Alternative Approach 1", "summary": "1 sentence summary" }
+  ],
+  "steps": ["Step 1 description", "Step 2 description"]
+}
+
+Code:
+${code}`;
+    const text = await callGeminiAPI(apiKey, "gemini-1.5-flash", prompt, "application/json", 1024);
+    const parsed = JSON.parse(text);
+    return {
+      detectedCategory: 'general-dsa',
+      approachName: parsed.approachName || "General Algorithm",
+      approachSummary: parsed.approachSummary || "Standard execution flow.",
+      alternativeApproaches: parsed.alternativeApproaches || [],
+      steps: parsed.steps || []
+    };
+  } catch (err) {
+    return {
+      detectedCategory: 'general-dsa',
+      approachName: "Code Analysis",
+      approachSummary: "Executing step-by-step code trace.",
+      alternativeApproaches: [],
+      steps: []
+    };
+  }
+};
+
+/**
  * Helper to call Gemini API supporting both standard API keys and OAuth Access Tokens (AQ.* / ya29.*)
  */
 const callGeminiAPI = async (apiKey, modelName, prompt, responseMimeType = "text/plain", maxOutputTokens = 2048) => {
