@@ -202,14 +202,24 @@ function App() {
               <span>⌘\ split</span>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="icon-button" onClick={() => setIsQuestionBankOpen(true)}>
-                <BookOpen size={16} />
-                <span style={{ marginLeft: '6px', fontSize: '13px' }}>Catalogue</span>
-              </button>
-              <button className="icon-button" onClick={() => setIsKeyModalOpen(true)}>
-                <Key size={16} />
-                <span style={{ marginLeft: '6px', fontSize: '13px' }}>API Key</span>
-              </button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsQuestionBankOpen(true)}
+                className="bg-neutral-900 border-neutral-800 text-neutral-300 hover:bg-neutral-800 gap-1.5 h-8 font-sans"
+              >
+                <BookOpen className="size-4 text-blue-500" />
+                <span>Catalogue</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsKeyModalOpen(true)}
+                className="bg-neutral-900 border-neutral-800 text-neutral-300 hover:bg-neutral-800 gap-1.5 h-8 font-sans"
+              >
+                <Key className="size-4 text-amber-500" />
+                <span>API Key</span>
+              </Button>
             </div>
           </div>
 
