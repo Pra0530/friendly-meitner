@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
 import { dsaQuestions } from '../data/dsaQuestions';
+import { Button } from '@/components/ui/button';
 
 const QuestionBank = ({ isOpen, onClose, onSelectQuestion }) => {
   const [expandedCategory, setExpandedCategory] = useState(null);
@@ -14,78 +15,58 @@ const QuestionBank = ({ isOpen, onClose, onSelectQuestion }) => {
     <AnimatePresence>
       {isOpen && (
         <>
+          {/* Backdrop Overlay */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            style={{
-              position: 'fixed',
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              zIndex: 40,
-              backdropFilter: 'blur(4px)'
-            }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
             onClick={onClose}
           />
+          
+          {/* Left Slide-in Drawer */}
           <motion.div
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            style={{
-              position: 'fixed',
-              top: 0, left: 0, bottom: 0,
-              width: '350px',
-              backgroundColor: 'var(--bg-surface)',
-              borderRight: '1px solid var(--border-glass)',
-              zIndex: 50,
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '4px 0 20px rgba(0,0,0,0.3)'
-            }}
+            transition={{ type: 'spring', damping: 30, stiffness: 220 }}
+            className="fixed top-0 left-0 bottom-0 w-[350px] bg-neutral-900 border-r border-neutral-800 z-50 flex flex-col shadow-2xl"
           >
-            <div style={{
-              padding: '20px',
-              borderBottom: '1px solid var(--border-glass)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <BookOpen size={20} color="var(--accent-color)" />
-                <h2 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)' }}>DSA 100</h2>
+            {/* Drawer Header */}
+            <div className="p-5 border-b border-neutral-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BookOpen className="size-5 text-blue-500" />
+                <h2 className="text-lg font-bold text-neutral-100 font-sans m-0">DSA Catalogue</h2>
               </div>
-              <button className="icon-button" onClick={onClose}>
-                <X size={20} color="var(--text-secondary)" />
-              </button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onClose}
+                className="hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200"
+              >
+                <X className="size-5" />
+              </Button>
             </div>
 
-            <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+            {/* Question Categories List */}
+            <div className="p-5 overflow-y-auto flex-1 flex flex-col gap-3 scrollbar-thin">
               {dsaQuestions.map((categoryObj) => {
                 const isExpanded = expandedCategory === categoryObj.category;
                 return (
-                  <div key={categoryObj.category} style={{ marginBottom: '12px' }}>
-                    <button
+                  <div key={categoryObj.category} className="flex flex-col gap-1">
+                    <Button
+                      variant={isExpanded ? 'secondary' : 'outline'}
                       onClick={() => toggleCategory(categoryObj.category)}
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px',
-                        background: isExpanded ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                        border: '1px solid',
-                        borderColor: isExpanded ? 'var(--accent-color)' : 'var(--border-glass)',
-                        borderRadius: '8px',
-                        color: isExpanded ? 'var(--accent-color)' : 'var(--text-primary)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        fontWeight: isExpanded ? 'bold' : 'normal'
-                      }}
+                      className={`w-full justify-between h-11 px-3 border border-neutral-800 font-sans transition-all text-left text-sm ${
+                        isExpanded 
+                          ? 'bg-blue-600/10 text-blue-400 hover:bg-blue-600/15 border-blue-500/50 font-semibold' 
+                          : 'bg-neutral-950 text-neutral-300 hover:bg-neutral-800'
+                      }`}
                     >
-                      <span style={{ fontSize: '15px' }}>{categoryObj.category}</span>
-                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </button>
+                      <span>{categoryObj.category}</span>
+                      {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                    </Button>
                     
                     <AnimatePresence>
                       {isExpanded && (
@@ -93,38 +74,22 @@ const QuestionBank = ({ isOpen, onClose, onSelectQuestion }) => {
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          style={{ overflow: 'hidden' }}
+                          transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+                          className="overflow-hidden"
                         >
-                          <div style={{ padding: '8px 0 8px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div className="pl-3 py-1.5 flex flex-col gap-1 border-l border-neutral-800 ml-3">
                             {categoryObj.questions.map((q, idx) => (
-                              <button
+                              <Button
                                 key={idx}
+                                variant="ghost"
                                 onClick={() => {
                                   onSelectQuestion(q);
                                   onClose();
                                 }}
-                                style={{
-                                  textAlign: 'left',
-                                  padding: '8px 12px',
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: 'var(--text-secondary)',
-                                  fontSize: '13px',
-                                  cursor: 'pointer',
-                                  borderRadius: '4px',
-                                  transition: 'background 0.2s, color 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.target.style.background = 'rgba(255, 255, 255, 0.05)';
-                                  e.target.style.color = 'var(--text-primary)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.target.style.background = 'transparent';
-                                  e.target.style.color = 'var(--text-secondary)';
-                                }}
+                                className="w-full justify-start text-left text-[13px] text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50 h-8 px-2 font-normal rounded-md"
                               >
                                 {q.title || q}
-                              </button>
+                              </Button>
                             ))}
                           </div>
                         </motion.div>

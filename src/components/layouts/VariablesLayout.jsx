@@ -1,5 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
 const INTERNAL = new Set([
   'trace_steps','tracer','sys','json','object_ids','all_nodes',
@@ -42,9 +44,7 @@ const VariablesLayout = ({ currentState, trace, step }) => {
     if (s?.action === 'call' && s?.line_text?.includes('print(')) {
       const m = s.line_text.match(/print\((.+)\)/);
       if (m) {
-        // Evaluate using current variables at that step
         let out = m[1].replace(/["']/g, '');
-        // Check if it's a variable reference
         const sv = s.variables?.[out.trim()];
         if (sv !== undefined) out = String(sv);
         outputs.push(out);
@@ -52,117 +52,72 @@ const VariablesLayout = ({ currentState, trace, step }) => {
     }
   }
 
-  const actionMeta = {
-    assignment: { color: '#60a5fa', label: 'ASSIGN',   bg: 'rgba(96,165,250,0.10)' },
-    condition:  { color: '#fbbf24', label: 'CONDITION', bg: 'rgba(251,191,36,0.10)' },
-    loop:       { color: '#a78bfa', label: 'LOOP',      bg: 'rgba(167,139,250,0.10)' },
-    call:       { color: '#34d399', label: 'CALL',      bg: 'rgba(52,211,153,0.10)' },
-    return:     { color: '#f87171', label: 'RETURN',    bg: 'rgba(248,113,113,0.10)' },
-  };
-  const meta = actionMeta[action] || actionMeta.assignment;
-
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '20px',
-      padding: '8px 2px',
-      overflow: 'hidden'
-    }}>
-
-      {/* ── Condition TRUE / FALSE ── */}
+    <div className="w-full h-full flex flex-col gap-5 py-2 px-0.5 overflow-hidden font-sans">
+      
+      {/* ── Condition Evaluation (True/False Branches) ── */}
       <AnimatePresence mode="wait">
         {action === 'condition' && (
           <motion.div
             key={`cond-${step}`}
-            initial={{ scale: 0.8, opacity: 0 }}
+            initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '20px',
-              flexShrink: 0
-            }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+            className="flex items-center justify-center gap-5 shrink-0"
           >
-            {/* TRUE branch */}
+            {/* TRUE branch card */}
             <motion.div
               animate={{
-                scale: condResult === true ? 1.12 : 0.9,
-                opacity: condResult === false ? 0.25 : 1,
+                scale: condResult === true ? 1.08 : 0.94,
+                opacity: condResult === false ? 0.3 : 1,
               }}
-              transition={{ duration: 0.3 }}
-              style={{
-                background: 'rgba(52,211,153,0.15)',
-                border: `2px solid ${condResult === true ? '#34d399' : 'rgba(52,211,153,0.2)'}`,
-                borderRadius: '12px',
-                padding: '14px 28px',
-                textAlign: 'center',
-                boxShadow: condResult === true ? '0 0 24px rgba(52,211,153,0.35)' : 'none'
-              }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className={`rounded-xl px-7 py-3.5 text-center border-2 transition-all duration-200 ${
+                condResult === true 
+                  ? 'bg-emerald-500/10 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.25)]' 
+                  : 'bg-emerald-950/20 border-emerald-900/30'
+              }`}
             >
-              <div style={{ fontSize: '24px', marginBottom: '4px' }}>✓</div>
-              <div style={{ color: '#34d399', fontWeight: '700', fontSize: '15px' }}>TRUE</div>
+              <div className="text-xl mb-1">✓</div>
+              <div className="text-emerald-400 font-bold text-sm tracking-wide">TRUE</div>
             </motion.div>
 
-            {/* Condition expression */}
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginBottom: '4px' }}>evaluating</div>
-              <code style={{
-                color: '#fbbf24',
-                fontFamily: 'var(--font-mono)',
-                fontSize: '15px',
-                fontWeight: '600',
-                display: 'block',
-                maxWidth: '180px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}>
+            {/* Expression description */}
+            <div className="text-center max-w-[180px]">
+              <div className="text-neutral-500 text-[10px] uppercase tracking-wider mb-1">evaluating</div>
+              <code className="text-amber-400 font-mono text-sm font-semibold block overflow-hidden text-ellipsis whitespace-nowrap">
                 {lineText}
               </code>
             </div>
 
-            {/* FALSE branch */}
+            {/* FALSE branch card */}
             <motion.div
               animate={{
-                scale: condResult === false ? 1.12 : 0.9,
-                opacity: condResult === true ? 0.25 : 1,
+                scale: condResult === false ? 1.08 : 0.94,
+                opacity: condResult === true ? 0.3 : 1,
               }}
-              transition={{ duration: 0.3 }}
-              style={{
-                background: 'rgba(248,113,113,0.15)',
-                border: `2px solid ${condResult === false ? '#f87171' : 'rgba(248,113,113,0.2)'}`,
-                borderRadius: '12px',
-                padding: '14px 28px',
-                textAlign: 'center',
-                boxShadow: condResult === false ? '0 0 24px rgba(248,113,113,0.35)' : 'none'
-              }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className={`rounded-xl px-7 py-3.5 text-center border-2 transition-all duration-200 ${
+                condResult === false 
+                  ? 'bg-rose-500/10 border-rose-500 shadow-[0_0_20px_rgba(239,68,68,0.25)]' 
+                  : 'bg-rose-950/20 border-rose-900/30'
+              }`}
             >
-              <div style={{ fontSize: '24px', marginBottom: '4px' }}>✗</div>
-              <div style={{ color: '#f87171', fontWeight: '700', fontSize: '15px' }}>FALSE</div>
+              <div className="text-xl mb-1">✗</div>
+              <div className="text-rose-400 font-bold text-sm tracking-wide">FALSE</div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Memory Cells (Variable Boxes) ── */}
+      {/* ── Memory Panel (Variable grids) ── */}
       {cleanVars.length > 0 && (
-        <div style={{ flexShrink: 0 }}>
-          <div style={{
-            fontSize: '10px',
-            color: 'var(--text-muted)',
-            letterSpacing: '1.2px',
-            textTransform: 'uppercase',
-            marginBottom: '10px'
-          }}>
-            Memory
+        <div className="shrink-0 flex flex-col gap-2.5">
+          <div className="text-[10px] text-neutral-500 tracking-widest uppercase font-semibold">
+            Memory Scope
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+          <div className="flex flex-wrap gap-3">
             <AnimatePresence>
               {cleanVars.map(([k, v]) => {
                 const prev = getPrev(k);
@@ -176,73 +131,51 @@ const VariablesLayout = ({ currentState, trace, step }) => {
                   <motion.div
                     key={k}
                     layout
-                    initial={{ opacity: 0, scale: 0.7, y: 20 }}
-                    animate={{
-                      opacity: 1,
-                      scale: 1,
-                      y: 0,
-                      borderColor: changed ? '#60a5fa' : 'rgba(255,255,255,0.08)',
-                      boxShadow: changed ? '0 0 20px rgba(96,165,250,0.4)' : '0 0 0px transparent'
-                    }}
+                    initial={{ opacity: 0, scale: 0.95, y: 12 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
                     transition={{ type: 'spring', stiffness: 350, damping: 24 }}
-                    style={{
-                      background: changed ? 'rgba(96,165,250,0.08)' : 'var(--bg-surface)',
-                      border: `2px solid ${changed ? '#60a5fa' : 'rgba(255,255,255,0.08)'}`,
-                      borderRadius: '12px',
-                      padding: '12px 20px',
-                      minWidth: '80px',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
                   >
-                    {/* Animated shimmer when changed */}
-                    {changed && (
-                      <motion.div
-                        initial={{ x: '-100%' }}
-                        animate={{ x: '200%' }}
-                        transition={{ duration: 0.6 }}
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          background: 'linear-gradient(90deg, transparent, rgba(96,165,250,0.2), transparent)',
-                          pointerEvents: 'none'
-                        }}
-                      />
-                    )}
-                    <div style={{
-                      color: 'var(--text-muted)',
-                      fontSize: '11px',
-                      fontFamily: 'var(--font-mono)',
-                      marginBottom: '4px'
-                    }}>
-                      {k}
-                    </div>
-                    <motion.div
-                      key={`${k}-${String(v)}`}
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      style={{
-                        color: changed ? '#60a5fa' : '#e2e8f0',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '20px',
-                        fontWeight: '800',
-                        lineHeight: 1
-                      }}
+                    <Card 
+                      className={`relative min-w-[100px] border transition-all duration-300 ${
+                        changed 
+                          ? 'bg-blue-600/10 border-blue-500/60 shadow-[0_0_15px_rgba(59,130,246,0.2)]' 
+                          : 'bg-neutral-900/40 border-neutral-800'
+                      }`}
                     >
-                      {display}
-                    </motion.div>
-                    {changed && prev !== undefined && (
-                      <div style={{
-                        color: 'var(--text-muted)',
-                        fontSize: '10px',
-                        fontFamily: 'var(--font-mono)',
-                        marginTop: '4px',
-                        textDecoration: 'line-through',
-                        opacity: 0.6
-                      }}>
-                        {String(prev)}
-                      </div>
-                    )}
+                      {/* Swipe-shimmer on value change */}
+                      {changed && (
+                        <motion.div
+                          initial={{ x: '-100%' }}
+                          animate={{ x: '150%' }}
+                          transition={{ duration: 0.7, ease: 'easeOut' }}
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/15 to-transparent pointer-events-none"
+                        />
+                      )}
+                      
+                      <CardContent className="p-3 flex flex-col justify-between">
+                        <div className="text-neutral-500 text-[10px] font-mono tracking-wider uppercase mb-1">
+                          {k}
+                        </div>
+                        
+                        <motion.div
+                          key={`${k}-${String(v)}`}
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.15 }}
+                          className={`font-mono text-lg font-extrabold leading-none ${
+                            changed ? 'text-blue-400' : 'text-neutral-200'
+                          }`}
+                        >
+                          {display}
+                        </motion.div>
+                        
+                        {changed && prev !== undefined && (
+                          <div className="text-neutral-600 text-[10px] font-mono line-through mt-1.5 opacity-80">
+                            was {String(prev)}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </motion.div>
                 );
               })}
@@ -251,36 +184,22 @@ const VariablesLayout = ({ currentState, trace, step }) => {
         </div>
       )}
 
-      {/* ── Output (print results) ── */}
+      {/* ── Console Output Panel ── */}
       {outputs.length > 0 && (
-        <div style={{ flexShrink: 0 }}>
-          <div style={{
-            fontSize: '10px',
-            color: 'var(--text-muted)',
-            letterSpacing: '1.2px',
-            textTransform: 'uppercase',
-            marginBottom: '10px'
-          }}>
-            Output
+        <div className="shrink-0 flex flex-col gap-2.5">
+          <div className="text-[10px] text-neutral-500 tracking-widest uppercase font-semibold">
+            Console stdout
           </div>
-          <div style={{
-            background: '#050507',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: '10px',
-            padding: '12px 16px',
-            fontFamily: 'var(--font-mono)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px'
-          }}>
+          <div className="bg-neutral-950 border border-neutral-900 rounded-xl p-3.5 font-mono flex flex-col gap-1.5 max-h-[160px] overflow-y-auto">
             {outputs.map((o, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
-                style={{ display: 'flex', gap: '10px', color: '#a3e635', fontSize: '14px' }}
+                transition={{ duration: 0.15 }}
+                className="flex gap-2.5 text-lime-400 text-[13px] leading-relaxed"
               >
-                <span style={{ color: 'var(--text-muted)' }}>{'>'}</span>
+                <span className="text-neutral-600 select-none">&gt;</span>
                 <span>{o}</span>
               </motion.div>
             ))}

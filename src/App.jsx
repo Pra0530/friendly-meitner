@@ -11,6 +11,8 @@ import { generateExecutionTrace } from './services/aiService';
 import { pluginManager } from './services/pluginManager';
 import { Key, BookOpen, Cpu, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 const getInitialKey = () => {
   try { return localStorage.getItem('codemaster_api_key') || ''; }
@@ -137,26 +139,28 @@ function App() {
         onClose={() => setIsQuestionBankOpen(false)}
         onSelectQuestion={handleSelectQuestion}
       />
-      {isKeyModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="glass-panel" style={{ padding: '32px', width: '400px' }}>
-            <h2 style={{ marginBottom: '16px' }}>API Key Required</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '14px' }}>
-              CodeMaster uses Google Gemini to automatically analyze and trace your code.
-            </p>
+      <Dialog open={isKeyModalOpen} onOpenChange={setIsKeyModalOpen}>
+        <DialogContent className="bg-neutral-900 border border-neutral-800 text-neutral-200 p-6 sm:max-w-md" showCloseButton={true}>
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-neutral-100">API Key Configuration</DialogTitle>
+            <DialogDescription className="text-neutral-400 text-xs mt-1">
+              CodeMaster uses Google Gemini to automatically analyze and trace your code. Provide your API key below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 mt-2">
             <input
               type="password"
               value={tempKey}
               onChange={e => setTempKey(e.target.value)}
               placeholder="AIzaSy... or AQ...."
-              style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border-glass)', borderRadius: '8px', color: '#fff', marginBottom: '16px', outline: 'none' }}
+              className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white text-sm outline-none focus:border-blue-500 transition-colors"
             />
-            <button onClick={saveKey} style={{ width: '100%', padding: '12px', background: 'var(--accent-color)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+            <Button onClick={saveKey} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 rounded-lg transition-colors">
               Save & Continue
-            </button>
+            </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Main Layout — uses .app-container grid from CSS */}
       <div
