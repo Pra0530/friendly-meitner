@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logic & Automation Playground</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Load font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo">
+        <span class="logo-icon">📐</span>
+        <h1>Algorithm & Web Logic Playground</h1>
+      </div>
+      
+      <!-- App Mode Navigation Tabs -->
+      <nav class="nav-tabs">
+        <button id="tab-web-testing" class="nav-tab active">🧪 Web Automation Testing</button>
+        <button id="tab-rect-overlap" class="nav-tab">📐 Rectangle Overlap Visualizer</button>
+      </nav>
+    </header>
+
+    <!-- SECTION 1: WEB TESTING PLAYGROUND -->
+    <main id="section-web-testing" class="playground-layout app-section active">
+      <!-- LEFT: Mock Website -->
+      <section class="panel mock-website-panel">
+        <div class="panel-header">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+          <h2>Mock Website <span class="badge">index.html</span></h2>
+        </div>
+        
+        <div class="mock-browser-chrome">
+          <div class="address-bar">
+            <span class="lock-icon">🔒</span>
+            <span class="url-text" id="browser-url">https://mysandboxapp.com</span>
+          </div>
+        </div>
+
+        <div class="mock-content" id="mock-page-content">
+          <!-- Screen 1: Login Form -->
+          <div id="screen-login" class="mock-screen active">
+            <div class="form-card">
+              <h3>Secure Portal Login</h3>
+              <div class="form-group" id="group-username">
+                <label for="username">Username <code class="selector-tag">#username</code></label>
+                <input type="text" id="username" placeholder="Enter username (e.g. admin)" autocomplete="off">
+              </div>
+              <div class="form-group" id="group-password">
+                <label for="password">Password <code class="selector-tag">#password</code></label>
+                <input type="password" id="password" placeholder="Enter password (e.g. password123)" autocomplete="off">
+              </div>
+              <div class="form-row">
+                <div class="checkbox-group" id="group-remember">
+                  <input type="checkbox" id="remember">
+                  <label for="remember">Remember Me <code class="selector-tag">#remember</code></label>
+                </div>
+              </div>
+              <button id="login-btn" class="btn btn-primary">Login <code class="selector-tag">#login-btn</code></button>
+              
+              <!-- Message Box -->
+              <div id="login-message" class="message-box hide">
+                <span id="message-text"></span>
+                <code class="selector-tag">#login-message</code>
+              </div>
+            </div>
+          </div>
+
+          <!-- Screen 2: Counter & Theme Settings -->
+          <div id="screen-dashboard" class="mock-screen">
+            <div class="dashboard-card">
+              <h3>User Dashboard <span class="badge success">Logged In</span></h3>
+              <p>Welcome, <strong id="user-display">admin</strong>!</p>
+              
+              <hr>
+
+              <!-- Counter Test Area -->
+              <div class="dashboard-section" id="counter-section">
+                <h4>Interactive Counter <code class="selector-tag">.counter-area</code></h4>
+                <div class="counter-container">
+                  <button id="counter-decrement" class="btn btn-icon">-</button>
+                  <span id="counter-value">0</span>
+                  <button id="counter-increment" class="btn btn-icon">+</button>
+                </div>
+                <p class="selector-desc">Verify if incrementing and decrementing works dynamically.</p>
+              </div>
+
+              <hr>
+
+              <!-- Theme Toggle Test Area -->
+              <div class="dashboard-section" id="theme-section">
+                <h4>Theme Customizer <code class="selector-tag">#theme-toggle</code></h4>
+                <div class="theme-control">
+                  <span>Current Theme: <strong id="theme-status" class="dark-mode-status">Light Mode</strong></span>
+                  <button id="theme-toggle" class="btn btn-secondary">Toggle Dark Theme</button>
+                </div>
+              </div>
+
+              <button id="logout-btn" class="btn btn-danger">Log Out <code class="selector-tag">#logout-btn</code></button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Test Runner Console -->
+      <section class="panel test-runner-panel">
+        <div class="panel-header">
+          <h2>Test Logic Console <span class="badge secondary">runner.js</span></h2>
+          <div class="test-selector-wrapper">
+            <label for="test-select">Choose Test Suite:</label>
+            <select id="test-select">
+              <option value="loginSuccess">1. Success Login Test (Logical Path)</option>
+              <option value="loginFail">2. Incorrect Credentials Test</option>
+              <option value="counterTest">3. Counter Increment/Decrement Test</option>
+              <option value="themeToggle">4. Dark Theme Assertion Test</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="test-controls">
+          <button id="btn-run" class="control-btn run-btn">▶ Run Entire Test</button>
+          <button id="btn-step" class="control-btn step-btn">⏭ Step Line</button>
+          <button id="btn-reset" class="control-btn reset-btn">🔄 Reset</button>
+          
+          <div class="slider-group">
+            <label for="speed-slider">Delay: <span id="speed-val">1000</span>ms</label>
+            <input type="range" id="speed-slider" min="200" max="2500" step="100" value="1000">
+          </div>
+        </div>
+
+        <div class="playground-options">
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-inject-bug">
+            <span class="slider"></span>
+            Inject Mock App Bug (Breaks selectors/values to test failure logic)
+          </label>
+        </div>
+
+        <!-- Interactive Code Viewer -->
+        <div class="code-viewer-container">
+          <div class="code-header">
+            <span>Test Logic Code Snippet</span>
+            <span id="step-indicator">Step 0 / 0</span>
+          </div>
+          <pre id="code-snippet-pre"><code class="language-js" id="code-display">Select a test suite to view code...</code></pre>
+        </div>
+
+        <!-- Real-time Test Assertion Output -->
+        <div class="test-output-container">
+          <div class="output-header">
+            <span>Execution Logs & Assertions</span>
+            <button id="btn-clear-logs" class="text-btn">Clear Logs</button>
+          </div>
+          <div class="console-logs" id="console-logs">
+            <div class="log-line info">Select a test suite and click "Run Entire Test" or "Step Line" to start testing.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- SECTION 2: RECTANGLE OVERLAP VISUALIZER -->
+    <main id="section-rect-overlap" class="playground-layout app-section">
+      <!-- LEFT: 2D Animated Canvas & Controls -->
+      <section class="panel canvas-panel">
+        <div class="panel-header">
+          <h2>Interactive 2D Canvas <span class="badge secondary">Drag or edit coordinates</span></h2>
+          <div class="preset-buttons">
+            <button id="btn-preset-overlap" class="btn btn-sm btn-secondary">Overlap Ex.</button>
+            <button id="btn-preset-separate" class="btn btn-sm btn-secondary">Separate Ex.</button>
+            <button id="btn-preset-contained" class="btn btn-sm btn-secondary">Inside Ex.</button>
+          </div>
+        </div>
+
+        <div class="canvas-wrapper">
+          <canvas id="rect-canvas" width="600" height="400"></canvas>
+          <div class="canvas-hint">💡 Tip: Click and drag any rectangle directly on the grid!</div>
+        </div>
+
+        <!-- Point Inputs Form -->
+        <div class="coords-form">
+          <div class="rect-inputs rect1-inputs">
+            <h4>Rectangle 1 (Blue)</h4>
+            <div class="coord-grid">
+              <div class="input-inline">
+                <label>Top-Left (l1):</label>
+                <span>X: <input type="number" id="l1-x" value="0"></span>
+                <span>Y: <input type="number" id="l1-y" value="10"></span>
+              </div>
+              <div class="input-inline">
+                <label>Bottom-Right (r1):</label>
+                <span>X: <input type="number" id="r1-x" value="10"></span>
+                <span>Y: <input type="number" id="r1-y" value="0"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="rect-inputs rect2-inputs">
+            <h4>Rectangle 2 (Orange)</h4>
+            <div class="coord-grid">
+              <div class="input-inline">
+                <label>Top-Left (l2):</label>
+                <span>X: <input type="number" id="l2-x" value="5"></span>
+                <span>Y: <input type="number" id="l2-y" value="5"></span>
+              </div>
+              <div class="input-inline">
+                <label>Bottom-Right (r2):</label>
+                <span>X: <input type="number" id="r2-x" value="15"></span>
+                <span>Y: <input type="number" id="r2-y" value="0"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Algorithm Logic Evaluator -->
+      <section class="panel logic-evaluator-panel">
+        <div class="panel-header">
+          <h2>Overlap Algorithm & Test Suite <span class="badge success">do_overlap()</span></h2>
+          <div class="coord-system-toggle">
+            <label class="toggle-switch-sm">
+              <input type="checkbox" id="toggle-y-up" checked>
+              <span>Math Y-Up Space</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="test-controls">
+          <button id="btn-rect-run" class="control-btn run-btn">▶ Run Animated Test Suite</button>
+          <button id="btn-rect-step" class="control-btn step-btn">⏭ Next Scenario</button>
+          <button id="btn-rect-reset" class="control-btn reset-btn">🔄 Reset Defaults</button>
+        </div>
+
+        <!-- Overlap Result Banner -->
+        <div id="overlap-banner" class="overlap-banner success">
+          <span class="banner-icon">✨</span>
+          <span id="banner-text" class="banner-text">RECTANGLES OVERLAP</span>
+        </div>
+
+        <!-- Code Viewer with Python / JS toggle -->
+        <div class="code-viewer-container">
+          <div class="code-header">
+            <span>Algorithm Logic (Python / JS)</span>
+            <div class="lang-switch">
+              <button id="btn-lang-python" class="lang-btn active">Python</button>
+              <button id="btn-lang-js" class="lang-btn">JavaScript</button>
+            </div>
+          </div>
+          <pre id="rect-code-pre"><code id="rect-code-display" class="language-python"># Checking overlap conditions...</code></pre>
+        </div>
+
+        <!-- Step-by-Step Logic Conditions Evaluation Table -->
+        <div class="eval-table-container">
+          <h4>Real-time Boundary Conditions Analysis</h4>
+          <div class="condition-list">
+            <div class="condition-card" id="cond-horizontal-1">
+              <div class="cond-header">
+                <span class="cond-title">1. Rect 1 Right of Rect 2?</span>
+                <span id="badge-cond-1" class="cond-badge pass">FALSE</span>
+              </div>
+              <div class="cond-expr"><code>l1.x > r2.x</code> &nbsp;➔&nbsp; <span id="expr-val-1">0 > 15</span></div>
+            </div>
+
+            <div class="condition-card" id="cond-horizontal-2">
+              <div class="cond-header">
+                <span class="cond-title">2. Rect 2 Right of Rect 1?</span>
+                <span id="badge-cond-2" class="cond-badge pass">FALSE</span>
+              </div>
+              <div class="cond-expr"><code>l2.x > r1.x</code> &nbsp;➔&nbsp; <span id="expr-val-2">5 > 10</span></div>
+            </div>
+
+            <div class="condition-card" id="cond-vertical-1">
+              <div class="cond-header">
+                <span class="cond-title">3. Rect 1 Above Rect 2?</span>
+                <span id="badge-cond-3" class="cond-badge pass">FALSE</span>
+              </div>
+              <div class="cond-expr"><code id="code-cond-3">r1.y > l2.y</code> &nbsp;➔&nbsp; <span id="expr-val-3">0 > 5</span></div>
+            </div>
+
+            <div class="condition-card" id="cond-vertical-2">
+              <div class="cond-header">
+                <span class="cond-title">4. Rect 2 Above Rect 1?</span>
+                <span id="badge-cond-4" class="cond-badge pass">FALSE</span>
+              </div>
+              <div class="cond-expr"><code id="code-cond-4">r2.y > l1.y</code> &nbsp;➔&nbsp; <span id="expr-val-4">0 > 10</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>Building logic skills for web automation and algorithms. Observe live boundaries and condition statements.</p>
+    </footer>
+  </div>
+
+  <script src="test-runner.js"></script>
+  <script src="rectangle-overlap.js"></script>
+</body>
+</html>
