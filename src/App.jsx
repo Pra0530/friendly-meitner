@@ -223,39 +223,32 @@ function App() {
             </div>
           </div>
 
+          {/* ── Execution Error Banner (Always Rendered on Error) ── */}
+          {errorMessage && (
+            <div className="flex-shrink-0 bg-red-950/20 border border-red-900/50 rounded-lg p-3.5 flex items-start gap-2.5 mb-3 font-sans">
+              <span className="text-red-500 text-base shrink-0 mt-0.5">✕</span>
+              <div className="flex-1">
+                <div className="text-red-400 font-bold text-xs uppercase tracking-wider mb-1">Execution Error</div>
+                <div className="text-neutral-300 font-mono text-[12px] break-all leading-relaxed">
+                  {errorMessage}
+                </div>
+                <div className="text-neutral-500 text-xs mt-2 font-sans">
+                  💡 Make sure your code is complete, self-contained, and runs successfully in a standard browser environment (e.g. no Node.js system imports like 'playwright').
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setErrorMessage(null)}
+                className="h-6 w-6 text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800"
+              >
+                ✕
+              </Button>
+            </div>
+          )}
+
           {aiData ? (
             <>
-
-              {/* ── Execution Error Banner ── */}
-              {errorMessage && (
-                <div style={{
-                  flexShrink: 0,
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.4)',
-                  borderRadius: '8px',
-                  padding: '10px 16px',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px',
-                  marginBottom: '8px'
-                }}>
-                  <span style={{ color: '#ef4444', fontSize: '16px', flexShrink: 0 }}>✕</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: '#ef4444', fontWeight: '600', fontSize: '13px', marginBottom: '2px' }}>Execution Error</div>
-                    <div style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '12px', wordBreak: 'break-word' }}>
-                      {errorMessage}
-                    </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '6px' }}>
-                      💡 Make sure your code is complete and self-contained (e.g. define and call the function with sample data).
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setErrorMessage(null)}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px', flexShrink: 0, padding: '0 4px' }}
-                  >×</button>
-                </div>
-              )}
-
               {/* Visualizer grows */}
               <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', margin: '8px 0' }}>
                 <Visualizer
